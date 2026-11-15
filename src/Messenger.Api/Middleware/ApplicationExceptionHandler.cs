@@ -23,6 +23,8 @@ public class ApplicationExceptionHandler(
                 (StatusCodes.Status400BadRequest, "Ошибка валидации", exception.Message),
             InvalidCredentialsException =>
                 (StatusCodes.Status401Unauthorized, "Неверные учётные данные", exception.Message),
+            UserNotFoundException =>
+                (StatusCodes.Status404NotFound, "Пользователь не найден", exception.Message),
             DuplicatePublicIdException =>
                 (StatusCodes.Status409Conflict, "Публичный ID уже занят", exception.Message),
             _ =>

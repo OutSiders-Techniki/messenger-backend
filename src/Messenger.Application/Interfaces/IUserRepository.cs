@@ -5,6 +5,10 @@ namespace Messenger.Application.Interfaces;
 
 public interface IUserRepository
 {
+    /// <summary>
+    /// Ищет пользователя по публичному ID. Только точное совпадение:
+    /// частичный ID совпадением не считается.
+    /// </summary>
     Task<User?> GetByPublicIdAsync(string publicId, CancellationToken cancellationToken = default);
 
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddSingleton<ISessionTokenGenerator, SessionTokenGenerator>();
         services.AddScoped<RegistrationService>();
         services.AddScoped<AuthService>();
+        services.AddScoped<UserSearchService>();
 
         return services;
     }
