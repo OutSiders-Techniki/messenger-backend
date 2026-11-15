@@ -1,4 +1,8 @@
+using Messenger.Application.Interfaces;
+using Messenger.Application.Services;
 using Messenger.Infrastructure.Db;
+using Messenger.Infrastructure.Repositories;
+using Messenger.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +19,9 @@ public static class DependencyInjection
                     configuration.GetConnectionString("DefaultConnection"),
                     npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
                 .UseSnakeCaseNamingConvention());
+
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 
         return services;
     }
