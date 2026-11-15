@@ -1,0 +1,6 @@
+@MessengerApi_HostAddress = http://localhost:5273
+
+GET {{MessengerApi_HostAddress}}/health
+Accept: application/json
+
+###

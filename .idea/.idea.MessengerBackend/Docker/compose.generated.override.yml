@@ -1,0 +1,21 @@
+# This is a generated file. Not intended for manual editing.
+services:
+  messenger-api:
+    build:
+      context: "/home/renamq/RiderProjects/MessengerBackend"
+      dockerfile: "src/Messenger.Api/Dockerfile"
+      target: "base"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net10.0/Messenger.Api.dll"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    image: "messenger-api:dev"
+    ports: []
+    volumes:
+    - "/home/renamq/RiderProjects/MessengerBackend/src/Messenger.Api:/app:rw"
+    - "/home/renamq/RiderProjects/MessengerBackend:/src:rw"
+    - "/home/renamq/.nuget/packages:/home/app/.nuget/packages"
+    working_dir: "/app"
