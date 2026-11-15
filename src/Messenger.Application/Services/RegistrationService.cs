@@ -19,9 +19,11 @@ public class RegistrationService(
         RegisterRequest request,
         CancellationToken cancellationToken = default)
     {
-        Validate(request.Password);
+        var password = request.Password ?? string.Empty;
 
-        var passwordHash = passwordHasher.Hash(request.Password);
+        Validate(password);
+
+        var passwordHash = passwordHasher.Hash(password);
 
         for (var attempt = 0; attempt < MaxIdAttempts; attempt++)
         {

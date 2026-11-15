@@ -1,5 +1,4 @@
 using Messenger.Application.Interfaces;
-using Messenger.Application.Services;
 using Messenger.Infrastructure.Db;
 using Messenger.Infrastructure.Repositories;
 using Messenger.Infrastructure.Services;
@@ -21,6 +20,7 @@ public static class DependencyInjection
                 .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ISessionStore, SessionRepository>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 
         return services;

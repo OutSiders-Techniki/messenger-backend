@@ -15,6 +15,12 @@ public class UserRepository(AppDbContext context) : IUserRepository
             .SingleOrDefaultAsync(u => u.PublicId == publicId, cancellationToken);
     }
 
+    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return context.Users
+            .SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
+    }
+
     public async Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
         context.Users.Add(user);

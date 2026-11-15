@@ -7,6 +7,8 @@ public interface IUserRepository
 {
     Task<User?> GetByPublicIdAsync(string publicId, CancellationToken cancellationToken = default);
 
+    Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Добавляет пользователя. Бросает <see cref="DuplicatePublicIdException"/>,
     /// если публичный ID уже занят.

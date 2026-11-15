@@ -13,12 +13,21 @@ erDiagram
     users ||--o{ messages : "sender_id"
     users ||--o{ messages : "owner_id"
     messages ||--o{ attachments : ""
+    users ||--o{ sessions : ""
 
     users {
         uuid id PK
         varchar(32) public_id UK "публичный ID для поиска"
         text password_hash "Argon2id"
         timestamptz created_at
+    }
+
+    sessions {
+        uuid id PK
+        uuid user_id FK
+        varchar(64) token_hash UK "SHA-256 хеш токена, не сам токен"
+        timestamptz created_at
+        timestamptz expires_at
     }
 
     dialogs {
@@ -64,11 +73,19 @@ erDiagram
 - «удалить у себя» — физический `DELETE` строки владельца, копия второго остаётся;
 - «удалить у обоих» — `DELETE` обеих строк в одной транзакции.
 
+## Сессии
+
+Токен сессии — 32 случайных байта в base64url, клиенту уходит в HttpOnly-cookie.
+В БД хранится **только SHA-256 хеш токена**, поэтому утечка базы не даёт готовых сессий.
+Выход удаляет строку сессии, поэтому защищённые запросы сразу возвращают 401.
+Протухшие сессии удаляются при создании новой.
+
 ## Ограничения и индексы
 
 | Объект | Назначение |
 |---|---|
 | `users.public_id` UNIQUE | поиск по точному публичному ID |
+| `sessions.token_hash` UNIQUE | поиск сессии по хешу токена из cookie |
 | `dialogs.pair_key` UNIQUE | дубликат диалога 1-на-1 не создаётся |
 | `messages(dialog_id, owner_id, client_message_id)` UNIQUE | идемпотентная отправка, дедупликация |
 | `messages(dialog_id, owner_id, sent_at)` | постраничная загрузка истории |

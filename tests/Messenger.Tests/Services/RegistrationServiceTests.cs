@@ -19,7 +19,7 @@ public class RegistrationServiceTests
     {
         var sut = CreateSut();
 
-        await sut.RegisterAsync(new RegisterRequest("password123"));
+        await sut.RegisterAsync(new RegisterRequest { Password = "password123" });
 
         var user = Assert.Single(_users.Users);
         Assert.NotEqual("password123", user.PasswordHash);
@@ -31,7 +31,7 @@ public class RegistrationServiceTests
     {
         var sut = CreateSut();
 
-        var response = await sut.RegisterAsync(new RegisterRequest("password123"));
+        var response = await sut.RegisterAsync(new RegisterRequest { Password = "password123" });
 
         Assert.Equal(_idGenerator.LastGenerated, response.PublicId);
         Assert.Equal(response.PublicId, Assert.Single(_users.Users).PublicId);
@@ -44,7 +44,7 @@ public class RegistrationServiceTests
         _users.TakenIds.Add("DUP");
         var sut = CreateSut();
 
-        var response = await sut.RegisterAsync(new RegisterRequest("password123"));
+        var response = await sut.RegisterAsync(new RegisterRequest { Password = "password123" });
 
         Assert.Equal("FREE", response.PublicId);
         Assert.Single(_users.Users);
@@ -59,7 +59,7 @@ public class RegistrationServiceTests
         var sut = CreateSut();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.RegisterAsync(new RegisterRequest("password123")));
+            () => sut.RegisterAsync(new RegisterRequest { Password = "password123" }));
     }
 
     [Theory]
@@ -71,7 +71,7 @@ public class RegistrationServiceTests
         var sut = CreateSut();
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => sut.RegisterAsync(new RegisterRequest(password)));
+            () => sut.RegisterAsync(new RegisterRequest { Password = password }));
 
         Assert.Empty(_users.Users);
     }
@@ -83,7 +83,7 @@ public class RegistrationServiceTests
         var password = new string('a', RegistrationService.MaxPasswordLength + 1);
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => sut.RegisterAsync(new RegisterRequest(password)));
+            () => sut.RegisterAsync(new RegisterRequest { Password = password }));
     }
 
     private sealed class FakeUserRepository : IUserRepository
@@ -95,6 +95,9 @@ public class RegistrationServiceTests
 
         public Task<User?> GetByPublicIdAsync(string publicId, CancellationToken cancellationToken = default)
             => Task.FromResult(Users.SingleOrDefault(u => u.PublicId == publicId));
+
+        public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+            => Task.FromResult(Users.SingleOrDefault(u => u.Id == id));
 
         public Task AddAsync(User user, CancellationToken cancellationToken = default)
         {

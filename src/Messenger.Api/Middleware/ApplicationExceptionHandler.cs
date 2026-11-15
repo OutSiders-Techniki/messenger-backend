@@ -21,6 +21,8 @@ public class ApplicationExceptionHandler(
         {
             ValidationException =>
                 (StatusCodes.Status400BadRequest, "Ошибка валидации", exception.Message),
+            InvalidCredentialsException =>
+                (StatusCodes.Status401Unauthorized, "Неверные учётные данные", exception.Message),
             DuplicatePublicIdException =>
                 (StatusCodes.Status409Conflict, "Публичный ID уже занят", exception.Message),
             _ =>
