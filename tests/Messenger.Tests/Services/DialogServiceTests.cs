@@ -1,3 +1,4 @@
+using Messenger.Application.DTOs;
 using Messenger.Application.Exceptions;
 using Messenger.Application.Interfaces;
 using Messenger.Application.Services;
@@ -7,8 +8,13 @@ namespace Messenger.Tests.Services;
 
 public class DialogServiceTests
 {
+    private readonly FakeDialogRepository _dialogs;
     private readonly FakeUserRepository _users = new();
-    private readonly FakeDialogRepository _dialogs = new();
+
+    public DialogServiceTests()
+    {
+        _dialogs = new FakeDialogRepository(_users);
+    }
 
     private DialogService CreateSut() => new(_users, _dialogs);
 
@@ -66,8 +72,7 @@ public class DialogServiceTests
         var creator = SeedUser("CREATOR");
         var sut = CreateSut();
 
-        await Assert.ThrowsAsync<ValidationException>(
-            () => sut.CreateAsync(creator.Id, "CREATOR"));
+        await Assert.ThrowsAsync<ValidationException>(() => sut.CreateAsync(creator.Id, "CREATOR"));
 
         Assert.Empty(_dialogs.Dialogs);
     }
@@ -78,10 +83,39 @@ public class DialogServiceTests
         var creator = SeedUser("CREATOR");
         var sut = CreateSut();
 
-        await Assert.ThrowsAsync<UserNotFoundException>(
-            () => sut.CreateAsync(creator.Id, "NOPE"));
+        await Assert.ThrowsAsync<UserNotFoundException>(() => sut.CreateAsync(creator.Id, "NOPE"));
 
         Assert.Empty(_dialogs.Dialogs);
+    }
+
+    [Fact]
+    public async Task GetListAsync_ReturnsOnlyOwnDialogsWithCompanion()
+    {
+        var creator = SeedUser("CREATOR");
+        var companion = SeedUser("COMPANION");
+        var stranger = SeedUser("STRANGER");
+        var otherStranger = SeedUser("OTHER");
+
+        var sut = CreateSut();
+
+        await sut.CreateAsync(creator.Id, "COMPANION");
+        await sut.CreateAsync(stranger.Id, "OTHER");
+
+        var list = await sut.GetListAsync(creator.Id);
+
+        var item = Assert.Single(list);
+        Assert.Equal(companion.PublicId, item.CompanionPublicId);
+    }
+
+    [Fact]
+    public async Task GetListAsync_ForUserWithoutDialogs_ReturnsEmpty()
+    {
+        SeedUser("CREATOR");
+        var sut = CreateSut();
+
+        var list = await sut.GetListAsync(Guid.NewGuid());
+
+        Assert.Empty(list);
     }
 
     [Fact]
@@ -126,7 +160,7 @@ public class DialogServiceTests
         }
     }
 
-    private sealed class FakeDialogRepository : IDialogRepository
+    private sealed class FakeDialogRepository(FakeUserRepository users) : IDialogRepository
     {
         public List<Dialog> Dialogs { get; } = [];
 
@@ -156,6 +190,7 @@ public class DialogServiceTests
                 DialogId = dialog.Id,
                 UserId = firstUserId,
                 JoinedAt = dialog.CreatedAt,
+                User = users.Users.Single(u => u.Id == firstUserId),
             });
 
             dialog.Participants.Add(new DialogParticipant
@@ -163,11 +198,27 @@ public class DialogServiceTests
                 DialogId = dialog.Id,
                 UserId = secondUserId,
                 JoinedAt = dialog.CreatedAt,
+                User = users.Users.Single(u => u.Id == secondUserId),
             });
 
             Dialogs.Add(dialog);
 
             return Task.FromResult(new DialogLookup(dialog, Created: true));
+        }
+
+        public Task<IReadOnlyList<DialogListItem>> GetForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<DialogListItem> result = Dialogs
+                .Where(d => d.Participants.Any(p => p.UserId == userId))
+                .Select(d => new DialogListItem(
+                    d.Id,
+                    d.Participants.First(p => p.UserId != userId).User.PublicId,
+                    d.CreatedAt))
+                .ToList();
+
+            return Task.FromResult(result);
         }
     }
 }

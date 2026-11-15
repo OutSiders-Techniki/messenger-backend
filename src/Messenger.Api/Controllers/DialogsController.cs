@@ -8,7 +8,7 @@ namespace Messenger.Api.Controllers;
 
 [ApiController]
 [Route("dialogs")]
-public class DialogsController(DialogService dialogs) : ControllerBase
+public class DialogsController(DialogService dialogService) : ControllerBase
 {
     /// <summary>
     /// Создаёт диалог один-на-один с указанным пользователем. Если такой
@@ -24,20 +24,55 @@ public class DialogsController(DialogService dialogs) : ControllerBase
         [FromBody] CreateDialogRequest request,
         CancellationToken cancellationToken)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (!Guid.TryParse(userId, out var creatorId))
+        if (!TryGetUserId(out var creatorId))
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Требуется авторизация",
-                detail: "Сессия отсутствует или закончилась. Войдите заново.");
+            return BuildUnauthorized();
         }
 
-        var result = await dialogs.CreateAsync(creatorId, request.PublicId!, cancellationToken);
+        var result = await dialogService.CreateAsync(creatorId, request.PublicId!, cancellationToken);
 
         return result.Created
             ? StatusCode(StatusCodes.Status201Created, result.Dialog)
             : Ok(result.Dialog);
     }
+
+    /// <summary>
+    /// Список диалогов пользователя. Диалоги, в которых пользователь не
+    /// участвует, не показываются.
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    [ResponseCache(NoStore = true)]
+    [ProducesResponseType<IReadOnlyList<DialogListItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<DialogListItem>>> List(
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return BuildUnauthorized();
+        }
+
+        var dialogs = await dialogService.GetListAsync(userId, cancellationToken);
+
+        return Ok(dialogs);
+    }
+
+    private bool TryGetUserId(out Guid userId)
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(claim, out userId);
+    }
+
+    private ObjectResult BuildUnauthorized() => new(new ProblemDetails
+    {
+        Status = StatusCodes.Status401Unauthorized,
+        Title = "Требуется авторизация",
+        Detail = "Сессия отсутствует или закончилась. Войдите заново.",
+    })
+    {
+        StatusCode = StatusCodes.Status401Unauthorized,
+        ContentTypes = { "application/problem+json" },
+    };
 }

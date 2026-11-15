@@ -1,3 +1,4 @@
+using Messenger.Application.DTOs;
 using Messenger.Domain.Entities;
 
 namespace Messenger.Application.Interfaces;
@@ -15,5 +16,13 @@ public interface IDialogRepository
     Task<DialogLookup> GetOrCreateAsync(
         Guid firstUserId,
         Guid secondUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Диалоги, в которых участвует пользователь. Диалоги других
+    /// участников в выборку не попадают.
+    /// </summary>
+    Task<IReadOnlyList<DialogListItem>> GetForUserAsync(
+        Guid userId,
         CancellationToken cancellationToken = default);
 }

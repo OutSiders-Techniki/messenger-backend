@@ -1,7 +1,6 @@
 using Messenger.Application.DTOs;
 using Messenger.Application.Exceptions;
 using Messenger.Application.Interfaces;
-using Messenger.Domain.Entities;
 
 namespace Messenger.Application.Services;
 
@@ -40,5 +39,16 @@ public class DialogService(IUserRepository users, IDialogRepository dialogs)
         return new DialogCreationResult(
             new DialogResponse(lookup.Dialog.Id, companion.PublicId, lookup.Dialog.CreatedAt),
             lookup.Created);
+    }
+
+    /// <summary>
+    /// Список диалогов пользователя. Собеседником считается второй
+    /// участник; чужие диалоги в список не попадают.
+    /// </summary>
+    public async Task<IReadOnlyList<DialogListItem>> GetListAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await dialogs.GetForUserAsync(userId, cancellationToken);
     }
 }

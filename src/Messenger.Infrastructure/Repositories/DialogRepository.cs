@@ -1,3 +1,4 @@
+using Messenger.Application.DTOs;
 using Messenger.Application.Exceptions;
 using Messenger.Application.Interfaces;
 using Messenger.Domain.Entities;
@@ -71,6 +72,29 @@ public class DialogRepository(AppDbContext context) : IDialogRepository
 
             return new DialogLookup(concurrent, Created: false);
         }
+    }
+
+    public async Task<IReadOnlyList<DialogListItem>> GetForUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        // Проекция сразу в DTO: в память не попадают ни хеш пароля
+        // собеседника, ни прочие поля пользователя.
+        var items = await context.Dialogs
+            .AsNoTracking()
+            .Where(d => d.Participants.Any(p => p.UserId == userId))
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(d => new DialogListItem(
+                d.Id,
+                d.Participants
+                    .Where(p => p.UserId != userId)
+                    .Select(p => p.User.PublicId)
+                    .FirstOrDefault()!,
+                d.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        // Диалог без второго участника — аномалия данных, в список он не идёт.
+        return items.Where(i => !string.IsNullOrEmpty(i.CompanionPublicId)).ToList();
     }
 
     private Task<Dialog?> FindByPairKeyAsync(string pairKey, CancellationToken cancellationToken)
