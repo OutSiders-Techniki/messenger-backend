@@ -13,4 +13,17 @@ public class Dialog
 
     public ICollection<DialogParticipant> Participants { get; set; } = new List<DialogParticipant>();
     public ICollection<Message> Messages { get; set; } = new List<Message>();
+
+    /// <summary>
+    /// Ключ пары участников в отсортированном порядке: диалог между A и B
+    /// и между B и A — это один и тот же диалог.
+    /// </summary>
+    public static string PairKeyFor(Guid firstUserId, Guid secondUserId)
+    {
+        var (min, max) = firstUserId.CompareTo(secondUserId) <= 0
+            ? (firstUserId, secondUserId)
+            : (secondUserId, firstUserId);
+
+        return $"{min:D}:{max:D}";
+    }
 }

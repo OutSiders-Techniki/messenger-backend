@@ -20,6 +20,7 @@ public static class DependencyInjection
                 .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IDialogRepository, DialogRepository>();
         services.AddScoped<ISessionStore, SessionRepository>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 

@@ -32,7 +32,7 @@ erDiagram
 
     dialogs {
         uuid id PK
-        varchar(73) pair_key UK "minUserId:maxUserId — защита от дублей"
+        varchar(73) pair_key UK "minUserId:maxUserId — дедупликация, не секрет диалога"
         timestamptz created_at
     }
 
