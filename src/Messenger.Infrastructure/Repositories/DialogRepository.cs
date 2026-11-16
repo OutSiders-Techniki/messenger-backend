@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Messenger.Application.DTOs;
 using Messenger.Application.Exceptions;
 using Messenger.Application.Interfaces;
@@ -84,18 +85,44 @@ public class DialogRepository(AppDbContext context) : IDialogRepository
             .AsNoTracking()
             .Where(d => d.Participants.Any(p => p.UserId == userId))
             .OrderByDescending(d => d.CreatedAt)
-            .Select(d => new DialogListItem(
-                d.Id,
-                d.Participants
-                    .Where(p => p.UserId != userId)
-                    .Select(p => p.User.PublicId)
-                    .FirstOrDefault()!,
-                d.CreatedAt))
+            .Select(CompanionProjection(userId))
             .ToListAsync(cancellationToken);
 
         // Диалог без второго участника — аномалия данных, в список он не идёт.
         return items.Where(i => !string.IsNullOrEmpty(i.CompanionPublicId)).ToList();
     }
+
+    public async Task<DialogListItem?> FindForParticipantAsync(
+        Guid dialogId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await context.Dialogs
+            .AsNoTracking()
+            .Where(d => d.Id == dialogId && d.Participants.Any(p => p.UserId == userId))
+            .Select(CompanionProjection(userId))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (item is null || string.IsNullOrEmpty(item.CompanionPublicId))
+        {
+            return null;
+        }
+
+        return item;
+    }
+
+    /// <summary>
+    /// Проекция диалога в элемент списка: собеседник — второй участник.
+    /// Общая для выборки списка и открытия диалога.
+    /// </summary>
+    private static Expression<Func<Dialog, DialogListItem>> CompanionProjection(Guid userId) =>
+        dialog => new DialogListItem(
+            dialog.Id,
+            dialog.Participants
+                .Where(p => p.UserId != userId)
+                .Select(p => p.User.PublicId)
+                .FirstOrDefault()!,
+            dialog.CreatedAt);
 
     private Task<Dialog?> FindByPairKeyAsync(string pairKey, CancellationToken cancellationToken)
     {

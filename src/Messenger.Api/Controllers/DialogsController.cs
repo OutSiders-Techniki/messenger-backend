@@ -58,6 +58,30 @@ public class DialogsController(DialogService dialogService) : ControllerBase
         return Ok(dialogs);
     }
 
+    /// <summary>
+    /// Открытие диалога. Доступно только участникам: чужой диалог по
+    /// идентификатору не раскрывается.
+    /// </summary>
+    [Authorize]
+    [HttpGet("{id:guid}")]
+    [ResponseCache(NoStore = true)]
+    [ProducesResponseType<DialogListItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<DialogListItem>> GetById(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return BuildUnauthorized();
+        }
+
+        var dialog = await dialogService.GetByIdAsync(userId, id, cancellationToken);
+
+        return Ok(dialog);
+    }
+
     private bool TryGetUserId(out Guid userId)
     {
         var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);

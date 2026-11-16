@@ -25,6 +25,8 @@ public class ApplicationExceptionHandler(
                 (StatusCodes.Status401Unauthorized, "Неверные учётные данные", exception.Message),
             UserNotFoundException =>
                 (StatusCodes.Status404NotFound, "Пользователь не найден", exception.Message),
+            DialogNotFoundException =>
+                (StatusCodes.Status404NotFound, "Диалог не найден", exception.Message),
             DuplicateDialogException =>
                 (StatusCodes.Status409Conflict, "Диалог уже существует", exception.Message),
             DuplicatePublicIdException =>

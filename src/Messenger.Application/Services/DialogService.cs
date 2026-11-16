@@ -51,4 +51,23 @@ public class DialogService(IUserRepository users, IDialogRepository dialogs)
     {
         return await dialogs.GetForUserAsync(userId, cancellationToken);
     }
+
+    /// <summary>
+    /// Открытие диалога. Доступ только у участников: постороннему диалог
+    /// недоступен, и сам факт его существования не раскрывается.
+    /// </summary>
+    public async Task<DialogListItem> GetByIdAsync(
+        Guid userId,
+        Guid dialogId,
+        CancellationToken cancellationToken = default)
+    {
+        var dialog = await dialogs.FindForParticipantAsync(dialogId, userId, cancellationToken);
+
+        if (dialog is null)
+        {
+            throw new DialogNotFoundException();
+        }
+
+        return dialog;
+    }
 }

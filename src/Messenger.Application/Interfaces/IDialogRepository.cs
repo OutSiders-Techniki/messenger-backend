@@ -25,4 +25,13 @@ public interface IDialogRepository
     Task<IReadOnlyList<DialogListItem>> GetForUserAsync(
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Диалог по идентификатору — только если пользователь в нём участвует.
+    /// Для постороннего результат такой же, как для несуществующего диалога.
+    /// </summary>
+    Task<DialogListItem?> FindForParticipantAsync(
+        Guid dialogId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
 }

@@ -119,6 +119,44 @@ public class DialogServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_ForParticipant_ReturnsDialog()
+    {
+        var creator = SeedUser("CREATOR");
+        var companion = SeedUser("COMPANION");
+        var sut = CreateSut();
+
+        var created = await sut.CreateAsync(creator.Id, "COMPANION");
+
+        var dialog = await sut.GetByIdAsync(companion.Id, created.Dialog.Id);
+
+        Assert.Equal(created.Dialog.Id, dialog.Id);
+        Assert.Equal("CREATOR", dialog.CompanionPublicId);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ForStranger_ThrowsNotFound()
+    {
+        var creator = SeedUser("CREATOR");
+        SeedUser("COMPANION");
+        SeedUser("STRANGER");
+        var sut = CreateSut();
+
+        var created = await sut.CreateAsync(creator.Id, "COMPANION");
+
+        await Assert.ThrowsAsync<DialogNotFoundException>(() =>
+            sut.GetByIdAsync(_users.Users.Single(u => u.PublicId == "STRANGER").Id, created.Dialog.Id));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithUnknownDialog_ThrowsNotFound()
+    {
+        var creator = SeedUser("CREATOR");
+        var sut = CreateSut();
+
+        await Assert.ThrowsAsync<DialogNotFoundException>(() => sut.GetByIdAsync(creator.Id, Guid.NewGuid()));
+    }
+
+    [Fact]
     public void PairKeyFor_IsSymmetric()
     {
         var first = Guid.NewGuid();
@@ -217,6 +255,22 @@ public class DialogServiceTests
                     d.Participants.First(p => p.UserId != userId).User.PublicId,
                     d.CreatedAt))
                 .ToList();
+
+            return Task.FromResult(result);
+        }
+
+        public Task<DialogListItem?> FindForParticipantAsync(
+            Guid dialogId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            DialogListItem? result = Dialogs
+                .Where(d => d.Id == dialogId && d.Participants.Any(p => p.UserId == userId))
+                .Select(d => new DialogListItem(
+                    d.Id,
+                    d.Participants.First(p => p.UserId != userId).User.PublicId,
+                    d.CreatedAt))
+                .SingleOrDefault();
 
             return Task.FromResult(result);
         }
