@@ -21,6 +21,9 @@ public static class ApiErrorCodes
     /// <summary>Диалог не найден или пользователь в нём не участвует.</summary>
     public const string DialogNotFound = "dialog_not_found";
 
+    /// <summary>Вложение не найдено или пользователь не имеет к нему доступа.</summary>
+    public const string AttachmentNotFound = "attachment_not_found";
+
     /// <summary>Запрошенный адрес не существует.</summary>
     public const string NotFound = "not_found";
 

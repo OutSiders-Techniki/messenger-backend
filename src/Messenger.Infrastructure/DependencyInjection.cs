@@ -21,6 +21,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IDialogRepository, DialogRepository>();
+        services.AddScoped<IAttachmentRepository, AttachmentRepository>();
         services.AddScoped<ISessionStore, SessionRepository>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 

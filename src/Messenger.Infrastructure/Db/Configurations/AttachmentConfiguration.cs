@@ -1,3 +1,4 @@
+using Messenger.Application;
 using Messenger.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -19,11 +20,20 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<Attachment>
             .HasMaxLength(512)
             .IsRequired();
 
-        builder.Property(a => a.Size).IsRequired();
-        builder.Property(a => a.EncryptedMetadata).IsRequired();
-        builder.Property(a => a.UploadedAt).IsRequired();
+        builder.Property(a => a.ClientAttachmentId).IsRequired();
 
-        // Максимум 25 МБ на вложение
-        builder.ToTable(t => t.HasCheckConstraint("ck_attachments_size", "size > 0 AND size <= 26214400"));
+        // Клиентский идентификатор уникален в пределах копии сообщения.
+        builder.HasIndex(a => new { a.MessageId, a.ClientAttachmentId })
+            .IsUnique();
+
+        // Максимум 25 МБ на вложение. Лимит задан один раз в коде.
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_attachments_size",
+            $"size > 0 AND size <= {MediaLimits.MaxAttachmentSizeBytes}"));
+
+        // Идентификатор задаёт клиент: пустой быть не может.
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_attachments_client_id",
+            "client_attachment_id <> '00000000-0000-0000-0000-000000000000'"));
     }
 }

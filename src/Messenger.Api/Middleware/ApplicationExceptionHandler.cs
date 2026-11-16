@@ -32,6 +32,9 @@ public class ApplicationExceptionHandler(
             DialogNotFoundException =>
                 (StatusCodes.Status404NotFound, "Диалог не найден", exception.Message,
                     ApiErrorCodes.DialogNotFound),
+            AttachmentNotFoundException =>
+                (StatusCodes.Status404NotFound, "Вложение не найдено", exception.Message,
+                    ApiErrorCodes.AttachmentNotFound),
             DuplicateDialogException =>
                 (StatusCodes.Status409Conflict, "Диалог уже существует", exception.Message,
                     ApiErrorCodes.DuplicateDialog),

@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<AuthService>();
         services.AddScoped<UserSearchService>();
         services.AddScoped<DialogService>();
+        services.AddScoped<AttachmentService>();
 
         return services;
     }

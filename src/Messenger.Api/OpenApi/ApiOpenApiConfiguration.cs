@@ -28,6 +28,7 @@ public static class ApiOpenApiConfiguration
         ApiErrorCodes.InvalidCredentials,
         ApiErrorCodes.UserNotFound,
         ApiErrorCodes.DialogNotFound,
+        ApiErrorCodes.AttachmentNotFound,
         ApiErrorCodes.NotFound,
         ApiErrorCodes.MethodNotAllowed,
         ApiErrorCodes.Forbidden,
@@ -244,7 +245,8 @@ public static class ApiOpenApiConfiguration
             $"Доступ запрещён. Код: {ApiErrorCodes.Forbidden}.",
         StatusCodes.Status404NotFound =>
             $"Объект не найден или пользователь не имеет к нему доступа. "
-            + $"Коды: {ApiErrorCodes.UserNotFound}, {ApiErrorCodes.DialogNotFound}, {ApiErrorCodes.NotFound}.",
+            + $"Коды: {ApiErrorCodes.UserNotFound}, {ApiErrorCodes.DialogNotFound}, "
+            + $"{ApiErrorCodes.AttachmentNotFound}, {ApiErrorCodes.NotFound}.",
         StatusCodes.Status409Conflict =>
             $"Объект уже существует. Коды: {ApiErrorCodes.DuplicateDialog}, {ApiErrorCodes.DuplicatePublicId}.",
         StatusCodes.Status405MethodNotAllowed =>

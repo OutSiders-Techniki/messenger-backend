@@ -29,6 +29,10 @@ namespace Messenger.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("ClientAttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_attachment_id");
+
                     b.Property<byte[]>("EncryptedMetadata")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -55,11 +59,14 @@ namespace Messenger.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_attachments");
 
-                    b.HasIndex("MessageId")
-                        .HasDatabaseName("ix_attachments_message_id");
+                    b.HasIndex("MessageId", "ClientAttachmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_attachments_message_id_client_attachment_id");
 
                     b.ToTable("attachments", null, t =>
                         {
+                            t.HasCheckConstraint("ck_attachments_client_id", "client_attachment_id <> '00000000-0000-0000-0000-000000000000'");
+
                             t.HasCheckConstraint("ck_attachments_size", "size > 0 AND size <= 26214400");
                         });
                 });

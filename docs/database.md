@@ -57,6 +57,7 @@ erDiagram
     attachments {
         uuid id PK
         uuid message_id FK
+        uuid client_attachment_id "идентификатор от клиента, общий у копий"
         varchar(512) storage_key "путь к зашифрованным байтам"
         bigint size "CHECK: 0 < size <= 25 МБ"
         bytea encrypted_metadata "имя файла/тип, зашифрованы"
@@ -82,17 +83,19 @@ erDiagram
 
 ## Ограничения и индексы
 
-| Объект | Назначение |
-|---|---|
-| `users.public_id` UNIQUE | поиск по точному публичному ID |
-| `sessions.token_hash` UNIQUE | поиск сессии по хешу токена из cookie |
-| `dialogs.pair_key` UNIQUE | дубликат диалога 1-на-1 не создаётся |
-| `messages(dialog_id, owner_id, client_message_id)` UNIQUE | идемпотентная отправка, дедупликация |
-| `messages(dialog_id, owner_id, sent_at)` | постраничная загрузка истории |
-| `ck_messages_iv_length`: `length(iv) = 12` | IV AES-256-GCM 96 бит |
-| `ck_attachments_size`: `0 < size <= 26214400` | лимит 25 МБ на вложение |
-| `attachments.message_id` ON DELETE CASCADE | вложения уходят вместе с копией |
-| `messages.sender_id/owner_id` ON DELETE RESTRICT | удаление юзера не сносит историю молча |
+| Объект                                                    | Назначение                                         |
+|-----------------------------------------------------------|----------------------------------------------------|
+| `users.public_id` UNIQUE                                  | поиск по точному публичному ID                     |
+| `sessions.token_hash` UNIQUE                              | поиск сессии по хешу токена из cookie              |
+| `dialogs.pair_key` UNIQUE                                 | дубликат диалога 1-на-1 не создаётся               |
+| `messages(dialog_id, owner_id, client_message_id)` UNIQUE | идемпотентная отправка, дедупликация               |
+| `messages(dialog_id, owner_id, sent_at)`                  | постраничная загрузка истории                      |
+| `ck_messages_iv_length`: `length(iv) = 12`                | IV AES-256-GCM 96 бит                              |
+| `ck_attachments_size`: `0 < size <= 26214400`             | лимит 25 МБ на вложение                            |
+| `ck_attachments_client_id`                                | идентификатор вложения не может быть пустым        |
+| `attachments(message_id, client_attachment_id)` UNIQUE    | клиентский идентификатор вложения уникален в копии |
+| `attachments.message_id` ON DELETE CASCADE                | вложения уходят вместе с копией                    |
+| `messages.sender_id/owner_id` ON DELETE RESTRICT          | удаление юзера не сносит историю молча             |
 
 ## Что храним / что не храним
 
