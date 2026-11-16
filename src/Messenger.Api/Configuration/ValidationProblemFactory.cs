@@ -1,3 +1,4 @@
+using Messenger.Api.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Messenger.Api.Configuration;
@@ -16,8 +17,10 @@ public static class ValidationProblemFactory
             Status = StatusCodes.Status400BadRequest,
             Title = "Ошибка валидации",
             Detail = "Проверьте правильность переданных данных.",
-            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            Type = ApiProblem.TypeBase + "1",
         };
+
+        problem.Extensions["code"] = ApiErrorCodes.ValidationFailed;
 
         return new BadRequestObjectResult(problem)
         {

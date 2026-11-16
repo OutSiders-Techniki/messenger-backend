@@ -1,6 +1,7 @@
+using Messenger.Api.Configuration;
+using Messenger.Api.Contracts;
 using Messenger.Application.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Messenger.Api.Middleware;
 
@@ -17,23 +18,30 @@ public class ApplicationExceptionHandler(
         Exception exception,
         CancellationToken cancellationToken)
     {
-        var (status, title, detail) = exception switch
+        var (status, title, detail, code) = exception switch
         {
             ValidationException =>
-                (StatusCodes.Status400BadRequest, "Ошибка валидации", exception.Message),
+                (StatusCodes.Status400BadRequest, "Ошибка валидации", exception.Message,
+                    ApiErrorCodes.ValidationFailed),
             InvalidCredentialsException =>
-                (StatusCodes.Status401Unauthorized, "Неверные учётные данные", exception.Message),
+                (StatusCodes.Status401Unauthorized, "Неверные учётные данные", exception.Message,
+                    ApiErrorCodes.InvalidCredentials),
             UserNotFoundException =>
-                (StatusCodes.Status404NotFound, "Пользователь не найден", exception.Message),
+                (StatusCodes.Status404NotFound, "Пользователь не найден", exception.Message,
+                    ApiErrorCodes.UserNotFound),
             DialogNotFoundException =>
-                (StatusCodes.Status404NotFound, "Диалог не найден", exception.Message),
+                (StatusCodes.Status404NotFound, "Диалог не найден", exception.Message,
+                    ApiErrorCodes.DialogNotFound),
             DuplicateDialogException =>
-                (StatusCodes.Status409Conflict, "Диалог уже существует", exception.Message),
+                (StatusCodes.Status409Conflict, "Диалог уже существует", exception.Message,
+                    ApiErrorCodes.DuplicateDialog),
             DuplicatePublicIdException =>
-                (StatusCodes.Status409Conflict, "Публичный ID уже занят", exception.Message),
+                (StatusCodes.Status409Conflict, "Публичный ID уже занят", exception.Message,
+                    ApiErrorCodes.DuplicatePublicId),
             _ =>
                 (StatusCodes.Status500InternalServerError, "Внутренняя ошибка сервера",
-                    "Внутренняя ошибка сервера. Повторите попытку позже."),
+                    "Внутренняя ошибка сервера. Повторите попытку позже.",
+                    ApiErrorCodes.InternalError),
         };
 
         if (status >= StatusCodes.Status500InternalServerError)
@@ -53,12 +61,7 @@ public class ApplicationExceptionHandler(
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = title,
-                Detail = detail,
-            },
+            ProblemDetails = ApiProblem.Create(status, title, detail, code),
         });
     }
 }

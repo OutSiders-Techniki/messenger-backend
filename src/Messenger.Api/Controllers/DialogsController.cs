@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Messenger.Api.Configuration;
+using Messenger.Api.Contracts;
 using Messenger.Application.DTOs;
 using Messenger.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -89,12 +91,11 @@ public class DialogsController(DialogService dialogService) : ControllerBase
         return Guid.TryParse(claim, out userId);
     }
 
-    private ObjectResult BuildUnauthorized() => new(new ProblemDetails
-    {
-        Status = StatusCodes.Status401Unauthorized,
-        Title = "Требуется авторизация",
-        Detail = "Сессия отсутствует или закончилась. Войдите заново.",
-    })
+    private ObjectResult BuildUnauthorized() => new(ApiProblem.Create(
+        StatusCodes.Status401Unauthorized,
+        "Требуется авторизация",
+        "Сессия отсутствует или закончилась. Войдите заново.",
+        ApiErrorCodes.Unauthorized))
     {
         StatusCode = StatusCodes.Status401Unauthorized,
         ContentTypes = { "application/problem+json" },

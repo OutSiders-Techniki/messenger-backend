@@ -1,6 +1,7 @@
 using System.Security.Claims;
+using Messenger.Api.Configuration;
+using Messenger.Api.Contracts;
 using Messenger.Application.DTOs;
-using Messenger.Application.Exceptions;
 using Messenger.Application.Options;
 using Messenger.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -76,18 +77,28 @@ public class AuthController(
 
         if (!Guid.TryParse(userId, out var id))
         {
-            return Unauthorized();
+            return BuildUnauthorized();
         }
 
         var user = await authService.GetCurrentUserAsync(id, cancellationToken);
 
         if (user is null)
         {
-            return Unauthorized();
+            return BuildUnauthorized();
         }
 
         return Ok(user);
     }
+
+    private ObjectResult BuildUnauthorized() => new(ApiProblem.Create(
+        StatusCodes.Status401Unauthorized,
+        "Требуется авторизация",
+        "Сессия отсутствует или закончилась. Войдите заново.",
+        ApiErrorCodes.Unauthorized))
+    {
+        StatusCode = StatusCodes.Status401Unauthorized,
+        ContentTypes = { "application/problem+json" },
+    };
 
     private string? ReadSessionToken()
     {

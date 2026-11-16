@@ -1,20 +1,29 @@
 using Messenger.Api.Authentication;
 using Messenger.Api.Configuration;
 using Messenger.Api.Middleware;
+using Messenger.Api.OpenApi;
 using Messenger.Application;
 using Messenger.Application.Options;
 using Messenger.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(
+    ApiOpenApiConfiguration.DocumentName,
+    ApiOpenApiConfiguration.Configure);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<SessionCookieOptions>(builder.Configuration.GetSection(SessionCookieOptions.SectionName));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Ошибки, которые MVC формирует сам, приводим к общему виду:
+    // русский текст и машинно-читаемый код.
+    options.Filters.Add<ApiProblemCodeFilter>();
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApplicationExceptionHandler>();
 
@@ -33,12 +42,27 @@ var app = builder.Build();
 
 ValidateSessionOptions(app.Configuration);
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
+// JSON-документ спецификации доступен во всех средах: фронтенду нужен
+// стабильный контракт. Интерактивный UI не отдаём.
+app.MapOpenApi();
 app.UseExceptionHandler();
+app.UseStatusCodePages(async (StatusCodeContext statusCodeContext) =>
+{
+    // Ответы без тела (например, неизвестный маршрут или неверный метод)
+    // приводим к тому же формату ошибки, что и остальные ответы.
+    var context = statusCodeContext.HttpContext;
+    var status = context.Response.StatusCode;
+
+    var (title, detail, code) = ApiProblem.ForStatus(status);
+
+    var problem = ApiProblem.Create(status, title, detail, code);
+
+    await context.Response.WriteAsJsonAsync(
+        problem,
+        options: null,
+        contentType: "application/problem+json",
+        cancellationToken: context.RequestAborted);
+});
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -50,10 +74,8 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
 
 app.Run();
 
-/// <summary>
-/// Некорректная конфигурация cookie ломает безопасность молча,
-/// поэтому падаем сразу при старте.
-/// </summary>
+// Некорректная конфигурация cookie ломает безопасность молча,
+// поэтому падаем сразу при старте.
 static void ValidateSessionOptions(IConfiguration configuration)
 {
     var options = configuration

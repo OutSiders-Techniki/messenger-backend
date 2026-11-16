@@ -1,10 +1,11 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using Messenger.Api.Configuration;
+using Messenger.Api.Contracts;
 using Messenger.Application.Interfaces;
 using Messenger.Application.Options;
 using Messenger.Application.Services;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 namespace Messenger.Api.Authentication;
@@ -62,14 +63,16 @@ public class SessionAuthenticationHandler(
         Response.StatusCode = StatusCodes.Status401Unauthorized;
         Response.ContentType = "application/problem+json";
 
-        var problem = new ProblemDetails
-        {
-            Status = StatusCodes.Status401Unauthorized,
-            Title = "Требуется авторизация",
-            Detail = "Сессия отсутствует или закончилась. Войдите заново.",
-            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
-        };
+        var problem = ApiProblem.Create(
+            StatusCodes.Status401Unauthorized,
+            "Требуется авторизация",
+            "Сессия отсутствует или закончилась. Войдите заново.",
+            ApiErrorCodes.Unauthorized);
 
-        return Response.WriteAsJsonAsync(problem);
+        return Response.WriteAsJsonAsync(
+            problem,
+            options: null,
+            contentType: "application/problem+json",
+            cancellationToken: Context.RequestAborted);
     }
 }

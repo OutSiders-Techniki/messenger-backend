@@ -5,6 +5,9 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <!-- XML-документация попадает в OpenAPI-спецификацию. -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -20,6 +23,12 @@
         <Link>.dockerignore</Link>
       </Content>
     </ItemGroup>
+
+    <!-- XML-документация DTO попадает в схемы OpenAPI-спецификации. -->
+    <Target Name="CopyApplicationXmlDocs" AfterTargets="Build">
+        <Copy SourceFiles="..\Messenger.Application\bin\$(Configuration)\net10.0\Messenger.Application.xml"
+              DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"/>
+    </Target>
 
     <ItemGroup>
       <ProjectReference Include="..\Messenger.Application\Messenger.Application.csproj" />
