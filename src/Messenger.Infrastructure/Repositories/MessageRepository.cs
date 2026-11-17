@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Messenger.Infrastructure.Repositories;
 
 /// <summary>Все изменения и снимки истории сериализуются блокировкой строки диалога в PostgreSQL.</summary>
-public sealed partial class MessageRepository(AppDbContext context, FileDeletionProcessor cleanup) : IMessageRepository
+public sealed partial class MessageRepository(AppDbContext context, FileDeletionProcessor cleanup) : IMessageRepository, IMessageBatchRepository
 {
     public async Task<MessageSendResult> SendAsync(Guid userId, Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken = default)
     {
