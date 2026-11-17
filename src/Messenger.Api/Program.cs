@@ -2,6 +2,7 @@ using Messenger.Api.Authentication;
 using Messenger.Api.Configuration;
 using Messenger.Api.Middleware;
 using Messenger.Api.OpenApi;
+using Messenger.Api.Realtime;
 using Messenger.Application;
 using Messenger.Application.Options;
 using Messenger.Infrastructure;
@@ -45,6 +46,7 @@ builder.Services
         _ => { });
 builder.Services.AddAuthorization();
 builder.Services.AddMessengerSecurity(builder.Configuration);
+builder.Services.AddMessengerRealtime();
 
 var app = builder.Build();
 
@@ -90,6 +92,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapMessengerRealtime();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("HealthCheck");
