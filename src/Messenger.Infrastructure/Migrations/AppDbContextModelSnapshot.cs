@@ -383,4 +383,3 @@ namespace Messenger.Infrastructure.Migrations
         }
     }
 }
-

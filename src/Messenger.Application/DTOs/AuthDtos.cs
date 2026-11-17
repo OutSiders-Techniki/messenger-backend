@@ -16,4 +16,3 @@ public class LoginRequest
 public record LoginResponse(string PublicId);
 
 public record CurrentUserResponse(string PublicId, DateTime CreatedAt, Guid Id);
-

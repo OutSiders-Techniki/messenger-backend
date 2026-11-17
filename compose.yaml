@@ -39,4 +39,3 @@
 volumes:
   postgres-data:
   api-storage:
-

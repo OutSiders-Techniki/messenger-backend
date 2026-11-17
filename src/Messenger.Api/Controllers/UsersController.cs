@@ -32,4 +32,3 @@ public class UsersController(UserSearchService userSearch) : ControllerBase
         return Ok(response);
     }
 }
-

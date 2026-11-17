@@ -28,4 +28,3 @@ public class Dialog
         return $"{min:D}:{max:D}";
     }
 }
-

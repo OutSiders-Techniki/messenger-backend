@@ -43,4 +43,3 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
         builder.ToTable(t => t.HasCheckConstraint("ck_messages_iv_length", "length(iv) = 12"));
     }
 }
-
