@@ -20,10 +20,22 @@ public sealed class MessagesController(MessageService messages) : ControllerBase
     [RequestSizeLimit(100 * 1024)]
     [ProducesResponseType<SendMessageResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<SendMessageResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<SendMessageResponse>> Send(Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken)
     {
-        var result = await messages.SendAsync(UserId, dialogId, request, cancellationToken);
-        return StatusCode(result.Created ? StatusCodes.Status201Created : StatusCodes.Status200OK, result);
+        try
+        {
+            var result = await messages.SendAsync(UserId, dialogId, request, cancellationToken);
+            return StatusCode(result.Created ? StatusCodes.Status201Created : StatusCodes.Status200OK, result);
+        }
+        catch (MessageConflictException ex)
+        {
+            return new ObjectResult(ApiProblem.Create(409, "Конфликт сообщения", ex.Message, ApiErrorCodes.MessageConflict))
+            {
+                StatusCode = 409,
+                ContentTypes = { "application/problem+json" },
+            };
+        }
     }
 
     [HttpGet]

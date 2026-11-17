@@ -39,6 +39,7 @@ public static class ApiOpenApiConfiguration
         ApiErrorCodes.DuplicatePublicId,
         ApiErrorCodes.InternalError,
         ApiErrorCodes.RateLimited,
+        ApiErrorCodes.MessageConflict,
     ];
 
     /// <summary>
@@ -323,7 +324,7 @@ public static class ApiOpenApiConfiguration
             + $"{ApiErrorCodes.AttachmentNotFound}, {ApiErrorCodes.NotFound}.",
         StatusCodes.Status409Conflict =>
             $"Объект уже существует. Коды: {ApiErrorCodes.DuplicateDialog}, "
-            + $"{ApiErrorCodes.DuplicatePublicId}, {ApiErrorCodes.DuplicateAttachment}.",
+            + $"{ApiErrorCodes.DuplicatePublicId}, {ApiErrorCodes.DuplicateAttachment}, {ApiErrorCodes.MessageConflict}.",
         StatusCodes.Status413PayloadTooLarge =>
             $"Файл больше максимально допустимых 25 МБ. Код: {ApiErrorCodes.AttachmentTooLarge}.",
         StatusCodes.Status405MethodNotAllowed =>

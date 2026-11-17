@@ -21,6 +21,32 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
         if (recipients.Count != 2)
             throw new DialogNotFoundException();
 
+        var fingerprint = Fingerprint(dialogId, userId, request);
+        var receipt = await context.MessageReceipts.FindAsync([dialogId, request.Id], cancellationToken);
+        if (receipt is null)
+        {
+            // Совместимость с сообщениями, созданными до миграции протокола.
+            var old = await context.Messages.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.DialogId == dialogId && x.ClientMessageId == request.Id, cancellationToken);
+            if (old is not null)
+            {
+                receipt = ReceiptFor(old, dialog.MessageRevision);
+                context.MessageReceipts.Add(receipt);
+                await context.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        if (receipt is not null)
+        {
+            if (receipt.SenderId != userId || !CryptographicOperations.FixedTimeEquals(receipt.Fingerprint, fingerprint))
+                throw new MessageConflictException();
+            var copy = await context.Messages.AsNoTracking().SingleOrDefaultAsync(
+                x => x.DialogId == dialogId && x.OwnerId == userId && x.ClientMessageId == request.Id, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new MessageSendResult(
+                new SendMessageResponse(copy is null ? null : ToResponse(copy), false, copy is null, dialog.MessageRevision), []);
+        }
+
         foreach (var ownerId in recipients)
         {
             context.Messages.Add(new Message
@@ -30,6 +56,11 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
                 Iv = request.Iv!.ToArray(), Ciphertext = request.Ciphertext!.ToArray(),
             });
         }
+        context.MessageReceipts.Add(new MessageReceipt
+        {
+            DialogId = dialogId, ClientMessageId = request.Id, SenderId = userId,
+            Fingerprint = fingerprint, Revision = dialog.MessageRevision,
+        });
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         var packet = new MessageResponse(dialogId, userId, request.Version, request.Id, request.SentAt, request.Iv!, request.Ciphertext!);
@@ -73,6 +104,26 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
     private static MessageResponse ToResponse(Message row) => new(
         row.DialogId, row.SenderId, row.Version, row.ClientMessageId,
         new DateTimeOffset(DateTime.SpecifyKind(row.SentAt, DateTimeKind.Utc)), row.Iv, row.Ciphertext);
+
+    private static MessageReceipt ReceiptFor(Message row, long revision) => new()
+    {
+        DialogId = row.DialogId, ClientMessageId = row.ClientMessageId, SenderId = row.SenderId, Revision = revision,
+        Fingerprint = Fingerprint(row.DialogId, row.SenderId,
+            new SendMessageRequest(row.Version, row.ClientMessageId,
+                new DateTimeOffset(DateTime.SpecifyKind(row.SentAt, DateTimeKind.Utc)), row.Iv, row.Ciphertext)),
+    };
+
+    private static byte[] Fingerprint(Guid dialogId, Guid senderId, SendMessageRequest request)
+    {
+        using var buffer = new MemoryStream();
+        using (var writer = new BinaryWriter(buffer, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(dialogId.ToByteArray()); writer.Write(senderId.ToByteArray());
+            writer.Write(request.Id.ToByteArray()); writer.Write(request.Version);
+            writer.Write(request.SentAt.UtcTicks); writer.Write(request.Iv!); writer.Write(request.Ciphertext!);
+        }
+        return SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+    }
 
     private static string EncodeCursor(Message row) => Convert.ToBase64String(Encoding.ASCII.GetBytes(
         row.SentAt.Ticks.ToString(CultureInfo.InvariantCulture) + ":" + row.ClientMessageId.ToString("D")))
