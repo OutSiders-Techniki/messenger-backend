@@ -44,6 +44,7 @@ builder.Services
         SessionAuthenticationHandler.SchemeName,
         _ => { });
 builder.Services.AddAuthorization();
+builder.Services.AddMessengerSecurity(builder.Configuration);
 
 var app = builder.Build();
 
@@ -59,6 +60,11 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrations"))
 // JSON-документ спецификации доступен во всех средах: фронтенду нужен
 // стабильный контракт. Интерактивный UI не отдаём.
 app.MapOpenApi();
+app.UseMiddleware<SecurityHeadersMiddleware>();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
 app.UseExceptionHandler();
 app.UseStatusCodePages(async (StatusCodeContext statusCodeContext) =>
 {
@@ -78,6 +84,7 @@ app.UseStatusCodePages(async (StatusCodeContext statusCodeContext) =>
         cancellationToken: context.RequestAborted);
 });
 app.UseHttpsRedirection();
+app.UseMiddleware<SameOriginMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
