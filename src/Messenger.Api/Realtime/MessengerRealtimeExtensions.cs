@@ -10,6 +10,7 @@ public static class MessengerRealtimeExtensions
     {
         services.AddSingleton<MessageConnections>();
         services.AddScoped<SessionHubFilter>();
+        services.AddScoped<IMessageEvents, SignalRMessageEvents>();
         services.AddSignalR(options =>
         {
             options.EnableDetailedErrors = false;

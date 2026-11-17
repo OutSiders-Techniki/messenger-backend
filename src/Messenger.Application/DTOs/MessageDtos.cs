@@ -21,6 +21,8 @@ public sealed record MessageResponse(
 
 public sealed record SendMessageResponse(MessageResponse? Message, bool Created, bool Deleted, long Revision);
 public sealed record MessageHistoryResponse(IReadOnlyList<MessageResponse> Items, string? NextCursor, long Revision);
+public sealed record MessageDeletedEvent(Guid DialogId, Guid Id, bool ForEveryone, long Revision);
+public sealed record MessageReceivedEvent(MessageResponse Message, long Revision);
 
 public static class MessageLimits
 {

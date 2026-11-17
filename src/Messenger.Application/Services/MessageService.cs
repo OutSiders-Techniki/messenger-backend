@@ -4,12 +4,17 @@ using Messenger.Application.Interfaces;
 
 namespace Messenger.Application.Services;
 
-public sealed class MessageService(IMessageRepository messages)
+public sealed class MessageService(IMessageRepository messages, IMessageEvents events)
 {
     public async Task<SendMessageResponse> SendAsync(Guid userId, Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken = default)
     {
         Validate(request);
         var result = await messages.SendAsync(userId, dialogId, request, cancellationToken);
+        if (result.Response.Created)
+        {
+            await events.ReceivedAsync(result.Recipients,
+                new MessageReceivedEvent(result.Response.Message!, result.Response.Revision), cancellationToken);
+        }
         return result.Response;
     }
 
