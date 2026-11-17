@@ -88,12 +88,12 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
         return new MessageHistoryResponse(items, next, dialog.MessageRevision);
     }
 
-    public async Task<MessageDeleteResult> DeleteAsync(Guid userId, Guid dialogId, Guid messageId, CancellationToken cancellationToken = default)
+    public async Task<MessageDeleteResult> DeleteAsync(Guid userId, Guid dialogId, Guid messageId, bool forEveryone, CancellationToken cancellationToken = default)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var dialog = await LockDialogAsync(userId, dialogId, cancellationToken);
         var rows = await context.Messages
-            .Where(x => x.DialogId == dialogId && x.ClientMessageId == messageId && x.OwnerId == userId)
+            .Where(x => x.DialogId == dialogId && x.ClientMessageId == messageId && (forEveryone || x.OwnerId == userId))
             .Include(x => x.Attachments).ToListAsync(cancellationToken);
         if (rows.Count == 0)
         {
@@ -115,7 +115,7 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
                 context.PendingFileDeletions.Add(new PendingFileDeletion { StorageKey = key });
         }
         await context.SaveChangesAsync(cancellationToken);
-        IReadOnlyList<Guid> recipients = [userId];
+        var recipients = forEveryone ? await ParticipantIdsAsync(dialogId, cancellationToken) : [userId];
         await transaction.CommitAsync(cancellationToken);
         await cleanup.ProcessAsync(cancellationToken);
         return new MessageDeleteResult(true, dialog.MessageRevision, recipients);

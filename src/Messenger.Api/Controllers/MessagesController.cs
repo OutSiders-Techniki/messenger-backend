@@ -45,9 +45,9 @@ public sealed class MessagesController(MessageService messages) : ControllerBase
 
     [HttpDelete("{messageId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> Delete(Guid dialogId, Guid messageId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Delete(Guid dialogId, Guid messageId, [FromQuery] bool forEveryone = false, CancellationToken cancellationToken = default)
     {
-        await messages.DeleteAsync(UserId, dialogId, messageId, cancellationToken);
+        await messages.DeleteAsync(UserId, dialogId, messageId, forEveryone, cancellationToken);
         return NoContent();
     }
 }
