@@ -20,8 +20,10 @@ public sealed record MessageResponse(
     [property: JsonPropertyName("ct")] byte[] Ciphertext);
 
 public sealed record SendMessageResponse(MessageResponse? Message, bool Created, bool Deleted, long Revision);
+public sealed record MessageHistoryResponse(IReadOnlyList<MessageResponse> Items, string? NextCursor, long Revision);
 
 public static class MessageLimits
 {
     public const int MaxCiphertextBytes = 64 * 1024;
+    public const int MaxHistoryPageSize = 100;
 }

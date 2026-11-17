@@ -26,5 +26,10 @@ public sealed class MessagesController(MessageService messages) : ControllerBase
         return StatusCode(result.Created ? StatusCodes.Status201Created : StatusCodes.Status200OK, result);
     }
 
+    [HttpGet]
+    [ProducesResponseType<MessageHistoryResponse>(StatusCodes.Status200OK)]
+    public Task<MessageHistoryResponse> History(Guid dialogId, [FromQuery] int limit = 50, [FromQuery] string? before = null, CancellationToken cancellationToken = default) =>
+        messages.GetHistoryAsync(UserId, dialogId, limit, before, cancellationToken);
+
 
 }

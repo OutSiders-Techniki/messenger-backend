@@ -36,6 +36,26 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
         return new MessageSendResult(new SendMessageResponse(packet, true, false, dialog.MessageRevision), recipients);
     }
 
+    public async Task<MessageHistoryResponse> GetHistoryAsync(Guid userId, Guid dialogId, int limit, string? before, CancellationToken cancellationToken = default)
+    {
+        var cursor = ParseCursor(before);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var dialog = await LockDialogAsync(userId, dialogId, cancellationToken);
+        var query = context.Messages.AsNoTracking().Where(x => x.DialogId == dialogId && x.OwnerId == userId);
+        if (cursor is not null)
+        {
+            var (sentAt, id) = cursor.Value;
+            query = query.Where(x => x.SentAt < sentAt || (x.SentAt == sentAt && x.ClientMessageId.CompareTo(id) < 0));
+        }
+        var rows = await query.OrderByDescending(x => x.SentAt).ThenByDescending(x => x.ClientMessageId)
+            .Take(limit + 1).ToListAsync(cancellationToken);
+        var more = rows.Count > limit;
+        var items = rows.Take(limit).Select(ToResponse).ToArray();
+        var next = more ? EncodeCursor(rows[limit - 1]) : null;
+        await transaction.CommitAsync(cancellationToken);
+        return new MessageHistoryResponse(items, next, dialog.MessageRevision);
+    }
+
     private async Task<Dialog> LockDialogAsync(Guid userId, Guid dialogId, CancellationToken cancellationToken)
     {
         // Параметризованный SQL; посторонний не блокирует чужой диалог и не узнаёт, существует ли он.
@@ -54,4 +74,27 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
         row.DialogId, row.SenderId, row.Version, row.ClientMessageId,
         new DateTimeOffset(DateTime.SpecifyKind(row.SentAt, DateTimeKind.Utc)), row.Iv, row.Ciphertext);
 
+    private static string EncodeCursor(Message row) => Convert.ToBase64String(Encoding.ASCII.GetBytes(
+        row.SentAt.Ticks.ToString(CultureInfo.InvariantCulture) + ":" + row.ClientMessageId.ToString("D")))
+        .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static (DateTime SentAt, Guid Id)? ParseCursor(string? cursor)
+    {
+        if (cursor is null) return null;
+        try
+        {
+            var base64 = cursor.Replace('-', '+').Replace('_', '/');
+            base64 = base64.PadRight((base64.Length + 3) / 4 * 4, '=');
+            var parts = Encoding.ASCII.GetString(Convert.FromBase64String(base64)).Split(':');
+            if (parts.Length != 2 || !long.TryParse(parts[0], CultureInfo.InvariantCulture, out var ticks)
+                || ticks < DateTime.MinValue.Ticks || ticks > DateTime.MaxValue.Ticks
+                || !Guid.TryParseExact(parts[1], "D", out var id) || id == Guid.Empty)
+                throw new FormatException();
+            return (new DateTime(ticks, DateTimeKind.Utc), id);
+        }
+        catch (FormatException)
+        {
+            throw new ValidationException("Некорректный курсор истории.");
+        }
+    }
 }

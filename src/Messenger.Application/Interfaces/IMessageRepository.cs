@@ -7,4 +7,5 @@ public sealed record MessageSendResult(SendMessageResponse Response, IReadOnlyLi
 public interface IMessageRepository
 {
     Task<MessageSendResult> SendAsync(Guid userId, Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken = default);
+    Task<MessageHistoryResponse> GetHistoryAsync(Guid userId, Guid dialogId, int limit, string? before, CancellationToken cancellationToken = default);
 }

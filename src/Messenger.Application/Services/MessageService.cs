@@ -13,6 +13,15 @@ public sealed class MessageService(IMessageRepository messages)
         return result.Response;
     }
 
+    public Task<MessageHistoryResponse> GetHistoryAsync(Guid userId, Guid dialogId, int limit = 50, string? before = null, CancellationToken cancellationToken = default)
+    {
+        if (limit is < 1 or > MessageLimits.MaxHistoryPageSize)
+            throw new ValidationException("Размер страницы должен быть от 1 до 100.");
+        if (before?.Length > 128)
+            throw new ValidationException("Некорректный курсор истории.");
+        return messages.GetHistoryAsync(userId, dialogId, limit, before, cancellationToken);
+    }
+
     public static void Validate(SendMessageRequest request)
     {
         if (request.Version != 1)
