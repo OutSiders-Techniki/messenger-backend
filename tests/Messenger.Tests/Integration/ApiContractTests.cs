@@ -32,6 +32,26 @@ public class ApiContractTests(MessengerApiFactory factory) : IClassFixture<Messe
     }
 
     [Fact]
+    public async Task OpenApiDocument_MessagePacketMatchesCurrentFrontend()
+    {
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/openapi/v1.json");
+        response.EnsureSuccessStatusCode();
+        var document = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var schemas = document.GetProperty("components").GetProperty("schemas");
+        foreach (var name in new[] { "SendMessageRequest", "MessageResponse" })
+        {
+            var properties = schemas.GetProperty(name).GetProperty("properties");
+            Assert.Equal("integer", properties.GetProperty("sentAt").GetProperty("type").GetString());
+            Assert.Equal("int64", properties.GetProperty("sentAt").GetProperty("format").GetString());
+            Assert.Equal("base64url", properties.GetProperty("iv").GetProperty("format").GetString());
+            Assert.Equal("base64url", properties.GetProperty("ct").GetProperty("format").GetString());
+        }
+        Assert.Contains("publicId", schemas.GetProperty("MessageResponse").GetProperty("properties")
+            .GetProperty("senderId").GetProperty("description").GetString());
+    }
+
+    [Fact]
     public async Task OpenApiDocument_ContainsAllEndpoints()
     {
         var client = factory.CreateClient();

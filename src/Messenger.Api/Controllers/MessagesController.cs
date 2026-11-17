@@ -40,8 +40,13 @@ public sealed class MessagesController(MessageService messages) : ControllerBase
 
     [HttpGet]
     [ProducesResponseType<MessageHistoryResponse>(StatusCodes.Status200OK)]
-    public Task<MessageHistoryResponse> History(Guid dialogId, [FromQuery] int limit = 50, [FromQuery] string? before = null, CancellationToken cancellationToken = default) =>
-        messages.GetHistoryAsync(UserId, dialogId, limit, before, cancellationToken);
+    public Task<MessageHistoryResponse> History(Guid dialogId, [FromQuery] int limit = 50, [FromQuery] string? before = null,
+        [FromQuery] string? beforeId = null, CancellationToken cancellationToken = default)
+    {
+        if (beforeId is not null && (before is not null || !Guid.TryParseExact(beforeId, "D", out var id) || id == Guid.Empty))
+            throw new ValidationException("Передайте один корректный beforeId либо before.");
+        return messages.GetHistoryAsync(UserId, dialogId, limit, beforeId ?? before, cancellationToken);
+    }
 
     [HttpPost("sync")]
     [RequestSizeLimit(32 * 1024)]

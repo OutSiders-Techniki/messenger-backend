@@ -50,7 +50,11 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
             var items = (await HistoryAsync(actor, setup.DialogId)).GetProperty("items");
             Assert.Single(items.EnumerateArray());
             Assert.Equal(packet.Id, items[0].GetProperty("id").GetGuid());
-            Assert.Equal(packet.Ct, items[0].GetProperty("ct").GetBytesFromBase64());
+            Assert.Equal(setup.A.PublicId, items[0].GetProperty("senderId").GetString());
+            Assert.Equal(packet.SentAt, items[0].GetProperty("sentAt").GetInt64());
+            var encoded = items[0].GetProperty("ct").GetString()!;
+            var standard = encoded.Replace('-', '+').Replace('_', '/');
+            Assert.Equal(packet.Ct, Convert.FromBase64String(standard.PadRight((standard.Length + 3) / 4 * 4, '=')));
         }
         var path = $"/dialogs/{setup.DialogId}/messages";
         foreach (var responseToStranger in new[]
@@ -148,7 +152,7 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
         var ids = new HashSet<Guid>();
         for (var i = 0; i < 7; i++)
         {
-            var packet = Packet() with { SentAt = DateTimeOffset.FromUnixTimeMilliseconds(sentAt) };
+            var packet = Packet() with { SentAt = sentAt };
             ids.Add(packet.Id);
             await SendAsync(setup.A, setup.DialogId, packet);
         }
@@ -176,7 +180,7 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
                      valid with { Iv = new byte[11] }, valid with { Iv = null! },
                      valid with { Ct = new byte[15] }, valid with { Ct = null! },
                      valid with { Ct = new byte[65537] },
-                     valid with { SentAt = default },
+                     valid with { SentAt = -1 },
                  })
         {
             using var response = await setup.A.Client.PostAsJsonAsync(
@@ -189,6 +193,41 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
         using var badCursor = await setup.A.Client.GetAsync($"/dialogs/{setup.DialogId}/messages?before=invalid");
         Assert.Equal(HttpStatusCode.BadRequest, badCursor.StatusCode);
         await InDatabaseAsync(async db => Assert.False(await db.Messages.AnyAsync(m => m.DialogId == setup.DialogId)));
+    }
+
+    [SkippableFact]
+    public async Task FrontendBeforeIdPagination_UsesPublicSenderAndReturnsEachMessageOnce()
+    {
+        var setup = await SetupAsync();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var expected = new HashSet<Guid>();
+        for (var index = 0; index < 5; index++)
+        {
+            var packet = Packet() with { SentAt = timestamp };
+            expected.Add(packet.Id);
+            var sent = await SendAsync(setup.A, setup.DialogId, packet);
+            Assert.Equal(setup.A.PublicId, sent.GetProperty("message").GetProperty("senderId").GetString());
+            var replay = await SendAsync(setup.A, setup.DialogId, packet);
+            Assert.Equal(setup.A.PublicId, replay.GetProperty("message").GetProperty("senderId").GetString());
+        }
+        var found = new List<Guid>();
+        string? beforeId = null;
+        do
+        {
+            using var response = await setup.B.Client.GetAsync($"/dialogs/{setup.DialogId}/messages?limit=2"
+                + (beforeId is null ? "" : $"&beforeId={beforeId}"));
+            response.EnsureSuccessStatusCode();
+            var page = await JsonAsync(response);
+            var items = page.GetProperty("items").EnumerateArray().ToArray();
+            Assert.All(items, item => Assert.Equal(setup.A.PublicId, item.GetProperty("senderId").GetString()));
+            found.AddRange(items.Select(item => item.GetProperty("id").GetGuid()));
+            beforeId = page.GetProperty("nextBeforeId").GetString();
+            Assert.True(found.Count <= expected.Count, "beforeId repeated a history page.");
+        } while (beforeId is not null);
+        Assert.Equal(expected.Count, found.Count);
+        Assert.True(expected.SetEquals(found));
+        using var badAlias = await setup.B.Client.GetAsync($"/dialogs/{setup.DialogId}/messages?beforeId=invalid");
+        Assert.Equal(HttpStatusCode.BadRequest, badAlias.StatusCode);
     }
 
     [SkippableFact]
@@ -306,7 +345,7 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
     }
 
     private static PacketBody Packet() => new(
-        1, Guid.NewGuid(), DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+        1, Guid.NewGuid(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         System.Security.Cryptography.RandomNumberGenerator.GetBytes(12),
         System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
@@ -392,7 +431,7 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
 
     private sealed record Actor(Guid Id, string PublicId, string Token, HttpClient Client);
     private sealed record Setup(Actor A, Actor B, Actor C, Guid DialogId);
-    private sealed record PacketBody(int V, Guid Id, DateTimeOffset SentAt, byte[] Iv, byte[] Ct);
+    private sealed record PacketBody(int V, Guid Id, long SentAt, byte[] Iv, byte[] Ct);
 }
 
 [CollectionDefinition("Message database", DisableParallelization = true)]

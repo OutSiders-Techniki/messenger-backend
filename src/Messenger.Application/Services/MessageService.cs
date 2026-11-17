@@ -49,7 +49,7 @@ public sealed class MessageService(IMessageRepository messages, IMessageEvents e
             throw new ValidationException("Поддерживается только версия криптопакета 1.");
         if (request.Id == Guid.Empty)
             throw new ValidationException("Идентификатор сообщения не может быть пустым.");
-        if (request.SentAt == default || request.SentAt.Offset != TimeSpan.Zero || request.SentAt.Ticks % TimeSpan.TicksPerMillisecond != 0)
+        if (request.SentAt < DateTimeOffset.UnixEpoch || request.SentAt.Offset != TimeSpan.Zero || request.SentAt.Ticks % TimeSpan.TicksPerMillisecond != 0)
             throw new ValidationException("sentAt должен содержать время UTC с точностью до миллисекунд.");
         if (request.Iv is not { Length: 12 })
             throw new ValidationException("IV AES-GCM должен содержать ровно 12 байт.");

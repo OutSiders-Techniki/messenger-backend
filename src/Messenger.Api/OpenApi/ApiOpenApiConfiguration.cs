@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Messenger.Api.Contracts;
+using Messenger.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
@@ -76,6 +77,39 @@ public static class ApiOpenApiConfiguration
 
         options.AddSchemaTransformer((schema, context, _) =>
         {
+            // CLR-типы DateTimeOffset/byte[] передаются браузером как Unix-ms и Base64url.
+            if (context.JsonTypeInfo?.Type == typeof(SendMessageRequest)
+                || context.JsonTypeInfo?.Type == typeof(MessageResponse))
+            {
+                schema.Properties ??= new Dictionary<string, IOpenApiSchema>();
+                schema.Properties["sentAt"] = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Integer,
+                    Format = "int64",
+                    Description = "Целое неотрицательное число миллисекунд Unix (JavaScript Date.now()).",
+                };
+                schema.Properties["iv"] = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.String,
+                    Format = "base64url",
+                    Pattern = "^[A-Za-z0-9_-]{16}$",
+                    Description = "12 байт IV в Base64url без padding.",
+                };
+                schema.Properties["ct"] = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.String,
+                    Format = "base64url",
+                    Pattern = "^[A-Za-z0-9_-]+$",
+                    Description = "Шифротекст с GCM-тегом, Base64url без padding (16–65536 декодированных байт).",
+                };
+                if (context.JsonTypeInfo.Type == typeof(MessageResponse))
+                    schema.Properties["senderId"] = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.String,
+                        Description = "Публичный ID отправителя (publicId), используемый клиентом в AAD.",
+                    };
+            }
+
             // В схеме ошибки показываем машинно-читаемый код: фронтенд
             // ориентируется на него, а не на текст сообщения.
             if (context.JsonTypeInfo?.Type == typeof(ProblemDetails))

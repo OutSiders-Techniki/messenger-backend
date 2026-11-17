@@ -31,7 +31,7 @@ public sealed class RealtimeDeliveryTests
             await events.DeletedAsync([recipient], new MessageDeletedEvent(Guid.NewGuid(), Guid.NewGuid(), true, 2));
         else
             await events.ReceivedAsync([recipient], new MessageReceivedEvent(
-                new MessageResponse(Guid.NewGuid(), recipient, 1, Guid.NewGuid(), DateTimeOffset.UtcNow, new byte[12], new byte[16]), 1));
+                new MessageResponse(Guid.NewGuid(), "TESTUSER", 1, Guid.NewGuid(), DateTimeOffset.UtcNow, new byte[12], new byte[16]), 1));
 
         Assert.True(aborted);
         Assert.Null(connections.Find("recipient"));

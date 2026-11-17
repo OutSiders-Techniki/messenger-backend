@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Messenger.Infrastructure.Repositories;
 
 /// <summary>Все изменения и снимки истории сериализуются блокировкой строки диалога в PostgreSQL.</summary>
-public sealed class MessageRepository(AppDbContext context, FileDeletionProcessor cleanup) : IMessageRepository
+public sealed partial class MessageRepository(AppDbContext context, FileDeletionProcessor cleanup) : IMessageRepository
 {
     public async Task<MessageSendResult> SendAsync(Guid userId, Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken = default)
     {
@@ -41,7 +41,7 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
         {
             if (receipt.SenderId != userId || !CryptographicOperations.FixedTimeEquals(receipt.Fingerprint, fingerprint))
                 throw new MessageConflictException();
-            var copy = await context.Messages.AsNoTracking().SingleOrDefaultAsync(
+            var copy = await context.Messages.AsNoTracking().Include(x => x.Sender).SingleOrDefaultAsync(
                 x => x.DialogId == dialogId && x.OwnerId == userId && x.ClientMessageId == request.Id, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new MessageSendResult(
@@ -63,18 +63,29 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
             DialogId = dialogId, ClientMessageId = request.Id, SenderId = userId,
             Fingerprint = fingerprint, Revision = dialog.MessageRevision,
         });
+        var senderPublicId = await context.Users.Where(x => x.Id == userId).Select(x => x.PublicId).SingleAsync(cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        var packet = new MessageResponse(dialogId, userId, request.Version, request.Id, request.SentAt, request.Iv!, request.Ciphertext!);
+        var packet = new MessageResponse(dialogId, senderPublicId, request.Version, request.Id, request.SentAt, request.Iv!, request.Ciphertext!);
         return new MessageSendResult(new SendMessageResponse(packet, true, false, dialog.MessageRevision), recipients);
     }
 
     public async Task<MessageHistoryResponse> GetHistoryAsync(Guid userId, Guid dialogId, int limit, string? before, CancellationToken cancellationToken = default)
     {
-        var cursor = ParseCursor(before);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var dialog = await LockDialogAsync(userId, dialogId, cancellationToken);
-        var query = context.Messages.AsNoTracking().Where(x => x.DialogId == dialogId && x.OwnerId == userId);
+        var query = context.Messages.AsNoTracking().Include(x => x.Sender).Where(x => x.DialogId == dialogId && x.OwnerId == userId);
+        (DateTime SentAt, Guid Id)? cursor;
+        if (Guid.TryParseExact(before, "D", out var anchorId))
+        {
+            var anchor = await query.SingleOrDefaultAsync(x => x.ClientMessageId == anchorId, cancellationToken)
+                ?? throw new ValidationException("Сообщение beforeId недоступно. Загрузите историю заново.");
+            cursor = (anchor.SentAt, anchor.ClientMessageId);
+        }
+        else
+        {
+            cursor = ParseCursor(before);
+        }
         if (cursor is not null)
         {
             var (sentAt, id) = cursor.Value;
@@ -86,7 +97,7 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
         var items = rows.Take(limit).Select(ToResponse).ToArray();
         var next = more ? EncodeCursor(rows[limit - 1]) : null;
         await transaction.CommitAsync(cancellationToken);
-        return new MessageHistoryResponse(items, next, dialog.MessageRevision);
+        return new MessageHistoryResponse(items, next, dialog.MessageRevision, more ? rows[limit - 1].ClientMessageId : null);
     }
 
     public async Task<SyncMessagesResponse> SyncAsync(Guid userId, Guid dialogId, Guid[] ids, CancellationToken cancellationToken = default)
@@ -149,7 +160,7 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
         await context.DialogParticipants.Where(x => x.DialogId == dialogId).Select(x => x.UserId).ToListAsync(cancellationToken);
 
     private static MessageResponse ToResponse(Message row) => new(
-        row.DialogId, row.SenderId, row.Version, row.ClientMessageId,
+        row.DialogId, row.Sender.PublicId, row.Version, row.ClientMessageId,
         new DateTimeOffset(DateTime.SpecifyKind(row.SentAt, DateTimeKind.Utc)), row.Iv, row.Ciphertext);
 
     private static MessageReceipt ReceiptFor(Message row, long revision) => new()
