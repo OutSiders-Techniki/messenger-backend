@@ -131,6 +131,38 @@ public sealed class SecurityTests
     }
 
     [Fact]
+    public async Task DevelopmentProxyOrigin_WithDifferentUpstreamHost_ReachesValidation()
+    {
+        using var factory = new SecurityApiFactory();
+        using var client = factory.Client();
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5173");
+        client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "same-origin");
+        using var response = await client.PostAsJsonAsync("/auth/register", new { password = "short" });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AllowedProxyOrigin_DoesNotOverrideCrossSiteRejection()
+    {
+        using var factory = new SecurityApiFactory();
+        using var client = factory.Client();
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5173");
+        client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "cross-site");
+        using var response = await client.PostAsJsonAsync("/auth/register", new { password = "short" });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Production_DoesNotTrustDevelopmentProxyOrigin()
+    {
+        using var factory = new SecurityApiFactory(environment: "Production");
+        using var client = factory.Client();
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5173");
+        using var response = await client.PostAsJsonAsync("/auth/register", new { password = "short" });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task CrossOriginWebSocketHandshake_IsRejected()
     {
         using var factory = new SecurityApiFactory();

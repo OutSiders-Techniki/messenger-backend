@@ -26,6 +26,16 @@ dotnet dotnet-ef database update --project src/Messenger.Infrastructure --startu
 dotnet run --project src/Messenger.Api
 ```
 
+Для текущего frontend используйте HTTP-профиль backend:
+
+```sh
+dotnet run --project src/Messenger.Api --launch-profile http
+```
+
+Он слушает `http://localhost:5273`. Frontend запускается своей существующей
+командой `npm run dev -- --api=http://localhost:5273` на порту 5173.
+Этот dev-proxy разрешён только в Development; менять frontend-код не требуется.
+
 Не публикуйте локальную конфигурацию в сеть. Для сетевого развёртывания
 нужны HTTPS, `ASPNETCORE_ENVIRONMENT=Production`, `SESSION_COOKIE_SECURE=true`,
 собственный пароль PostgreSQL и корректная передача схемы/host от доверенного

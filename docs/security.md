@@ -16,6 +16,13 @@ HTTP допускается только Development-конфигурация. �
 TLS reverse proxy схема/host должны корректно доходить до приложения;
 не следует доверять Forwarded-заголовкам произвольных клиентов.
 
+Dev-proxy текущего frontend меняет upstream Host, сохраняя браузерный Origin.
+Поэтому Development-конфигурация явно допускает `http://localhost:5173` и
+`http://127.0.0.1:5173`. В остальных средах список пуст. Для доверенного
+публичного proxy задайте его точный origin в `Security:AllowedOrigins`.
+Wildcard, пути и credentials запрещены; `Sec-Fetch-Site: cross-site` отклоняется
+даже для origin из списка. CORS этим параметром не включается.
+
 Все ответы, включая ошибки, получают CSP без `unsafe-inline`/`unsafe-eval`,
 `X-Content-Type-Options: nosniff`, запрет iframe, `Referrer-Policy: no-referrer`,
 отключение camera/microphone/geolocation и `Cache-Control: no-store`.
