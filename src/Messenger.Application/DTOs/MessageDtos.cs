@@ -19,6 +19,7 @@ public sealed record MessageResponse(
     [property: JsonPropertyName("iv")] byte[] Iv,
     [property: JsonPropertyName("ct")] byte[] Ciphertext);
 
+public sealed record SendMessageResponse(MessageResponse? Message, bool Created, bool Deleted, long Revision);
 
 public static class MessageLimits
 {

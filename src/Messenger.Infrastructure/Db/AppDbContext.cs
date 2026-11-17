@@ -11,9 +11,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<MessageReceipt> MessageReceipts => Set<MessageReceipt>();
+    public DbSet<PendingFileDeletion> PendingFileDeletions => Set<PendingFileDeletion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 }
+

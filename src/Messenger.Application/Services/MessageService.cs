@@ -4,8 +4,15 @@ using Messenger.Application.Interfaces;
 
 namespace Messenger.Application.Services;
 
-public sealed class MessageService
+public sealed class MessageService(IMessageRepository messages)
 {
+    public async Task<SendMessageResponse> SendAsync(Guid userId, Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken = default)
+    {
+        Validate(request);
+        var result = await messages.SendAsync(userId, dialogId, request, cancellationToken);
+        return result.Response;
+    }
+
     public static void Validate(SendMessageRequest request)
     {
         if (request.Version != 1)
