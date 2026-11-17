@@ -1,7 +1,9 @@
 using Messenger.Application.Interfaces;
+using Messenger.Application.Options;
 using Messenger.Infrastructure.Db;
 using Messenger.Infrastructure.Repositories;
 using Messenger.Infrastructure.Services;
+using Messenger.Infrastructure.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,16 @@ public static class DependencyInjection
         services.AddScoped<IAttachmentRepository, AttachmentRepository>();
         services.AddScoped<ISessionStore, SessionRepository>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
+
+        var storageRoot = configuration[$"{AttachmentStorageOptions.SectionName}:RootPath"];
+
+        if (string.IsNullOrWhiteSpace(storageRoot))
+        {
+            storageRoot = new AttachmentStorageOptions().RootPath;
+        }
+
+        services.AddSingleton<IAttachmentContentStore>(
+            new FileSystemAttachmentContentStore(storageRoot));
 
         return services;
     }

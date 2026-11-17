@@ -24,6 +24,12 @@ public static class ApiErrorCodes
     /// <summary>Вложение не найдено или пользователь не имеет к нему доступа.</summary>
     public const string AttachmentNotFound = "attachment_not_found";
 
+    /// <summary>Размер вложения превышает максимум 25 МБ.</summary>
+    public const string AttachmentTooLarge = "attachment_too_large";
+
+    /// <summary>Вложение с таким идентификатором уже загружено.</summary>
+    public const string DuplicateAttachment = "duplicate_attachment";
+
     /// <summary>Запрошенный адрес не существует.</summary>
     public const string NotFound = "not_found";
 

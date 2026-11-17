@@ -35,6 +35,16 @@ public class ApplicationExceptionHandler(
             AttachmentNotFoundException =>
                 (StatusCodes.Status404NotFound, "Вложение не найдено", exception.Message,
                     ApiErrorCodes.AttachmentNotFound),
+            AttachmentTooLargeException =>
+                (StatusCodes.Status413PayloadTooLarge, "Слишком большой файл", exception.Message,
+                    ApiErrorCodes.AttachmentTooLarge),
+            DuplicateAttachmentException =>
+                (StatusCodes.Status409Conflict, "Вложение уже загружено", exception.Message,
+                    ApiErrorCodes.DuplicateAttachment),
+            BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge } =>
+                (StatusCodes.Status413PayloadTooLarge, "Слишком большой файл",
+                    "Максимальный размер одного вложения — 25 МБ.",
+                    ApiErrorCodes.AttachmentTooLarge),
             DuplicateDialogException =>
                 (StatusCodes.Status409Conflict, "Диалог уже существует", exception.Message,
                     ApiErrorCodes.DuplicateDialog),

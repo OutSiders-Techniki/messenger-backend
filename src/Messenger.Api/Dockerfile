@@ -21,6 +21,11 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./Messenger.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
+USER root
 WORKDIR /app
 COPY --from=publish /app/publish .
+# Каталог управляемого хранилища зашифрованных вложений должен быть
+# доступен пользователю приложения, а не root.
+RUN mkdir -p /app/storage && chown -R $APP_UID:$APP_UID /app
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Messenger.Api.dll"]

@@ -11,6 +11,11 @@ using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Предел тела запроса выше лимита вложения: превышение 25 МБ должен
+// отклонять сам сервер — с понятным сообщением и кодом ошибки, а не
+// веб-сервер.
+builder.WebHost.ConfigureKestrel(options => { options.Limits.MaxRequestBodySize = 64L * 1024 * 1024; });
+
 builder.Services.AddOpenApi(
     ApiOpenApiConfiguration.DocumentName,
     ApiOpenApiConfiguration.Configure);

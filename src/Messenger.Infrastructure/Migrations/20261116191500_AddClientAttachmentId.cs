@@ -24,8 +24,7 @@ namespace Messenger.Infrastructure.Migrations
 
             // Старые строки получают идентификатор самой строки: он уникален
             // в пределах копии, поэтому уникальный индекс создаётся без
-            // ошибок. Вложения появились вместе с этой задачей, таких строк
-            // в рабочих базах нет.
+            // ошибок.
             migrationBuilder.Sql(
                 "UPDATE attachments SET client_attachment_id = id WHERE client_attachment_id IS NULL");
 

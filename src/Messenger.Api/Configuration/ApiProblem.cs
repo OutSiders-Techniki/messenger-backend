@@ -22,6 +22,7 @@ public static class ApiProblem
         StatusCodes.Status404NotFound => TypeBase + "5",
         StatusCodes.Status405MethodNotAllowed => TypeBase + "6",
         StatusCodes.Status409Conflict => TypeBase + "10",
+        StatusCodes.Status413PayloadTooLarge => TypeBase + "14",
         StatusCodes.Status415UnsupportedMediaType => TypeBase + "16",
         _ => "https://tools.ietf.org/html/rfc9110#section-15.6.1",
     };
@@ -48,6 +49,9 @@ public static class ApiProblem
                 ApiErrorCodes.MethodNotAllowed),
         StatusCodes.Status409Conflict =>
             ("Конфликт", "Объект уже существует.", ApiErrorCodes.DuplicateDialog),
+        StatusCodes.Status413PayloadTooLarge =>
+            ("Слишком большой файл", "Максимальный размер одного вложения — 25 МБ.",
+                ApiErrorCodes.AttachmentTooLarge),
         StatusCodes.Status415UnsupportedMediaType =>
             ("Неверный тип содержимого", "Ожидается запрос в формате JSON.",
                 ApiErrorCodes.UnsupportedMediaType),

@@ -24,6 +24,12 @@ public class MessengerApiFactory : WebApplicationFactory<Program>
 
                 // Тесты идут по http, поэтому Secure-cookie выключаем.
                 ["Session:Secure"] = "false",
+
+                // Зашифрованные байты тестов пишем во временный каталог,
+                // рабочее хранилище не трогаем.
+                ["AttachmentStorage:RootPath"] = Path.Combine(
+                    Path.GetTempPath(),
+                    "messenger-tests-attachments"),
             }));
     }
 }

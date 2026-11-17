@@ -70,7 +70,7 @@ namespace Messenger.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_attachments_client_id", "client_attachment_id <> '00000000-0000-0000-0000-000000000000'");
 
-                            t.HasCheckConstraint("ck_attachments_size", "size > 0 AND size <= 26214400");
+                            t.HasCheckConstraint("ck_attachments_size", "size > 0 AND size <= 25000000");
                         });
                 });
 

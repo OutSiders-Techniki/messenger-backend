@@ -1,4 +1,5 @@
 using Messenger.Application.DTOs;
+using Messenger.Domain.Entities;
 
 namespace Messenger.Application.Interfaces;
 
@@ -25,4 +26,32 @@ public interface IAttachmentRepository
         Guid clientMessageId,
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Идентификатор копии сообщения, принадлежащей пользователю. Если
+    /// такой копии нет — результат <c>null</c>: постороннему сообщение
+    /// не раскрывается.
+    /// </summary>
+    Task<Guid?> FindMessageIdForOwnerAsync(
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Есть ли уже вложение с таким клиентским идентификатором в копии
+    /// сообщения пользователя.
+    /// </summary>
+    Task<bool> ExistsForOwnerAsync(
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid clientAttachmentId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Сохраняет вложение в копии сообщения. Повторная загрузка того же
+    /// клиентского идентификатора в ту же копию — конфликт.
+    /// </summary>
+    Task AddAsync(Attachment attachment, CancellationToken cancellationToken = default);
 }

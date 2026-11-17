@@ -1,7 +1,10 @@
 using System.Security.Claims;
 using Messenger.Api.Configuration;
 using Messenger.Api.Contracts;
+using Messenger.Api.OpenApi;
+using Messenger.Application;
 using Messenger.Application.DTOs;
+using Messenger.Application.Exceptions;
 using Messenger.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +20,13 @@ namespace Messenger.Api.Controllers;
 [Route("dialogs/{dialogId:guid}/messages/{clientMessageId:guid}/attachments")]
 public class AttachmentsController(AttachmentService attachmentService) : ControllerBase
 {
+    /// <summary>
+    /// Зашифрованные клиентом метаданные вложения: имя файла и тип
+    /// содержимого. Передаются в base64, чтобы не зависеть от кодировки
+    /// HTTP-заголовков.
+    /// </summary>
+    private const string MetadataHeaderName = "X-Attachment-Metadata";
+
     /// <summary>
     /// Метаданные вложения. Доступно только владельцу копии сообщения,
     /// к которому вложение относится: постороннему вложение не
@@ -76,6 +86,76 @@ public class AttachmentsController(AttachmentService attachmentService) : Contro
             cancellationToken);
 
         return Ok(metadata);
+    }
+
+    /// <summary>
+    /// Загрузка зашифрованных байтов вложения в свою копию сообщения.
+    /// Тело запроса — сами зашифрованные байты, без имени файла и типа
+    /// содержимого: MIME клиента не считается доверенным и сервер его не
+    /// использует. Зашифрованные клиентом метаданные (имя файла, тип)
+    /// передаются в заголовке X-Attachment-Metadata в base64.
+    /// </summary>
+    [Authorize]
+    [AttachmentUploadBody]
+    [HttpPost("{clientAttachmentId:guid}")]
+    [ProducesResponseType<AttachmentMetadataResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AttachmentMetadataResponse>> Upload(
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid clientAttachmentId,
+        [FromHeader(Name = MetadataHeaderName)]
+        string? encryptedMetadata,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return BuildUnauthorized();
+        }
+
+        var metadata = DecodeMetadata(encryptedMetadata);
+
+        // Размер известен заранее — отклоняем до чтения тела.
+        if (Request.ContentLength is > 0 and > MediaLimits.MaxAttachmentSizeBytes)
+        {
+            throw new AttachmentTooLargeException(MediaLimits.MaxAttachmentSizeBytes);
+        }
+
+        var uploaded = await attachmentService.UploadAsync(
+            userId,
+            dialogId,
+            clientMessageId,
+            clientAttachmentId,
+            metadata,
+            Request.Body,
+            cancellationToken);
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { dialogId, clientMessageId, clientAttachmentId },
+            uploaded);
+    }
+
+    private static byte[] DecodeMetadata(string? encryptedMetadata)
+    {
+        if (string.IsNullOrWhiteSpace(encryptedMetadata))
+        {
+            throw new ValidationException("Зашифрованные метаданные вложения обязательны.");
+        }
+
+        try
+        {
+            return Convert.FromBase64String(encryptedMetadata);
+        }
+        catch (FormatException)
+        {
+            throw new ValidationException(
+                "Зашифрованные метаданные вложения должны быть в формате base64.");
+        }
     }
 
     private bool TryGetUserId(out Guid userId)

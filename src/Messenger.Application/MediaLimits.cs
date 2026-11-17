@@ -6,6 +6,15 @@ namespace Messenger.Application;
 /// </summary>
 public static class MediaLimits
 {
-    /// <summary>Максимальный размер одного вложения в байтах (25 МБ).</summary>
-    public const int MaxAttachmentSizeBytes = 26_214_400;
+    /// <summary>
+    /// Максимальный размер одного вложения в байтах (25 МБ — десятичных,
+    /// как в техническом задании).
+    /// </summary>
+    public const int MaxAttachmentSizeBytes = 25_000_000;
+
+    /// <summary>
+    /// Максимальный размер зашифрованных метаданных вложения (имя файла и
+    /// тип содержимого) в байтах: ограничивает мусор в базе.
+    /// </summary>
+    public const int MaxAttachmentMetadataBytes = 16_384;
 }

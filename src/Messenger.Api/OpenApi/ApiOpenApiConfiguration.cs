@@ -29,6 +29,8 @@ public static class ApiOpenApiConfiguration
         ApiErrorCodes.UserNotFound,
         ApiErrorCodes.DialogNotFound,
         ApiErrorCodes.AttachmentNotFound,
+        ApiErrorCodes.AttachmentTooLarge,
+        ApiErrorCodes.DuplicateAttachment,
         ApiErrorCodes.NotFound,
         ApiErrorCodes.MethodNotAllowed,
         ApiErrorCodes.Forbidden,
@@ -149,8 +151,79 @@ public static class ApiOpenApiConfiguration
                 AddMissingErrorResponses(operation, context, requiresAuthorization);
             }
 
+            // Операции загрузки вложений: тело — поток зашифрованных байтов.
+            // Тип содержимого клиента не проверяется, поэтому media type
+            // указывается как бинарный, а не как обязательный.
+            if (IsAttachmentUpload(context))
+            {
+                operation.RequestBody = new OpenApiRequestBody
+                {
+                    Required = true,
+                    Description = "Зашифрованные байты вложения.",
+                    Content = new Dictionary<string, OpenApiMediaType>
+                    {
+                        ["application/octet-stream"] = new OpenApiMediaType
+                        {
+                            Schema = new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.String,
+                                Format = "binary",
+                                Description =
+                                    "Зашифрованные байты вложения. Тип содержимого "
+                                    + "не проверяется: подходит любой media type.",
+                            },
+                        },
+                    },
+                };
+
+                // Заголовок с метаданными обязателен: без него загрузка
+                // не проходит.
+                MarkMetadataHeaderRequired(operation);
+            }
+
             return Task.CompletedTask;
         });
+    }
+
+    /// <summary>Операция загрузки зашифрованного вложения.</summary>
+    private static bool IsAttachmentUpload(OpenApiOperationTransformerContext context)
+    {
+        return context.Description?.ActionDescriptor?.EndpointMetadata
+            ?.OfType<AttachmentUploadBodyAttribute>()
+            .Any() == true;
+    }
+
+    /// <summary>
+    /// Заголовок с зашифрованными метаданными вложения обязателен: без
+    /// него загрузка отклоняется.
+    /// </summary>
+    private static void MarkMetadataHeaderRequired(OpenApiOperation operation)
+    {
+        var parameters = operation.Parameters;
+
+        if (parameters is null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < parameters.Count; index++)
+        {
+            if (parameters[index] is not OpenApiParameter parameter
+                || parameter.Name != "X-Attachment-Metadata")
+            {
+                continue;
+            }
+
+            parameters[index] = new OpenApiParameter
+            {
+                Name = parameter.Name,
+                In = parameter.In,
+                Description = parameter.Description
+                              ?? "Зашифрованные клиентом метаданные вложения (имя файла, тип) в base64.",
+                Required = true,
+                Schema = parameter.Schema,
+            };
+        }
     }
 
     /// <summary>
@@ -248,7 +321,10 @@ public static class ApiOpenApiConfiguration
             + $"Коды: {ApiErrorCodes.UserNotFound}, {ApiErrorCodes.DialogNotFound}, "
             + $"{ApiErrorCodes.AttachmentNotFound}, {ApiErrorCodes.NotFound}.",
         StatusCodes.Status409Conflict =>
-            $"Объект уже существует. Коды: {ApiErrorCodes.DuplicateDialog}, {ApiErrorCodes.DuplicatePublicId}.",
+            $"Объект уже существует. Коды: {ApiErrorCodes.DuplicateDialog}, "
+            + $"{ApiErrorCodes.DuplicatePublicId}, {ApiErrorCodes.DuplicateAttachment}.",
+        StatusCodes.Status413PayloadTooLarge =>
+            $"Файл больше максимально допустимых 25 МБ. Код: {ApiErrorCodes.AttachmentTooLarge}.",
         StatusCodes.Status405MethodNotAllowed =>
             $"Метод не поддерживается для этого адреса. Код: {ApiErrorCodes.MethodNotAllowed}.",
         StatusCodes.Status415UnsupportedMediaType =>

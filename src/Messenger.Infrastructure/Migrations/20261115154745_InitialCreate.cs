@@ -115,7 +115,7 @@ namespace Messenger.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_attachments", x => x.id);
-                    table.CheckConstraint("ck_attachments_size", "size > 0 AND size <= 26214400");
+                    table.CheckConstraint("ck_attachments_size", "size > 0 AND size <= 25000000");
                     table.ForeignKey(
                         name: "fk_attachments_messages_message_id",
                         column: x => x.message_id,

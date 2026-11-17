@@ -8,6 +8,10 @@
       - "${API_PORT}:8080"
     environment:
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      # Зашифрованные байты вложений — в управляемом файловом хранилище.
+      AttachmentStorage__RootPath: /app/storage
+    volumes:
+      - api-storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,3 +34,4 @@
 
 volumes:
   postgres-data:
+  api-storage:

@@ -91,7 +91,7 @@ erDiagram
 | `messages(dialog_id, owner_id, client_message_id)` UNIQUE | идемпотентная отправка, дедупликация               |
 | `messages(dialog_id, owner_id, sent_at)`                  | постраничная загрузка истории                      |
 | `ck_messages_iv_length`: `length(iv) = 12`                | IV AES-256-GCM 96 бит                              |
-| `ck_attachments_size`: `0 < size <= 26214400`             | лимит 25 МБ на вложение                            |
+| `ck_attachments_size`: `0 < size <= 25000000`             | лимит 25 МБ на вложение                            |
 | `ck_attachments_client_id`                                | идентификатор вложения не может быть пустым        |
 | `attachments(message_id, client_attachment_id)` UNIQUE    | клиентский идентификатор вложения уникален в копии |
 | `attachments.message_id` ON DELETE CASCADE                | вложения уходят вместе с копией                    |
@@ -105,6 +105,17 @@ erDiagram
 | `dialogs` | участники и дата создания | ключ диалога |
 | `messages` | владелец копии, диалог, отправитель, v/id/sentAt/iv/ct | открытый текст |
 | `attachments` | путь к зашифрованным байтам, размер, ссылки | открытые файлы, исходное имя файла |
+
+## Хранилище файлов вложений
+
+Зашифрованные байты лежат в управляемом файловом хранилище, каталог задаётся
+настройкой `AttachmentStorage:RootPath` (по умолчанию `storage/attachments`).
+Имя файла генерирует сервер: имя, присланное клиентом, не используется и
+не сохраняется. В БД лежит только ключ файла (`attachments.storage_key`),
+размер и зашифрованные клиентом метаданные.
+
+В Docker Compose каталог подключён как том `api-storage` (`/app/storage`),
+поэтому байты не пропадают при пересоздании контейнера.
 
 ## Команды
 

@@ -63,7 +63,7 @@ namespace Messenger.Infrastructure.Migrations
 
                     b.ToTable("attachments", null, t =>
                         {
-                            t.HasCheckConstraint("ck_attachments_size", "size > 0 AND size <= 26214400");
+                            t.HasCheckConstraint("ck_attachments_size", "size > 0 AND size <= 25000000");
                         });
                 });
 
