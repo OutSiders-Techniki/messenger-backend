@@ -21,6 +21,8 @@ public sealed record MessageResponse(
 
 public sealed record SendMessageResponse(MessageResponse? Message, bool Created, bool Deleted, long Revision);
 public sealed record MessageHistoryResponse(IReadOnlyList<MessageResponse> Items, string? NextCursor, long Revision);
+public sealed record SyncMessagesRequest(Guid[]? Ids);
+public sealed record SyncMessagesResponse(IReadOnlyList<Guid> MissingIds, long Revision);
 public sealed record MessageDeletedEvent(Guid DialogId, Guid Id, bool ForEveryone, long Revision);
 public sealed record MessageReceivedEvent(MessageResponse Message, long Revision);
 
@@ -28,4 +30,5 @@ public static class MessageLimits
 {
     public const int MaxCiphertextBytes = 64 * 1024;
     public const int MaxHistoryPageSize = 100;
+    public const int MaxSyncIds = 500;
 }

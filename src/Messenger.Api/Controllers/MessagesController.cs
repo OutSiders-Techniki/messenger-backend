@@ -43,6 +43,12 @@ public sealed class MessagesController(MessageService messages) : ControllerBase
     public Task<MessageHistoryResponse> History(Guid dialogId, [FromQuery] int limit = 50, [FromQuery] string? before = null, CancellationToken cancellationToken = default) =>
         messages.GetHistoryAsync(UserId, dialogId, limit, before, cancellationToken);
 
+    [HttpPost("sync")]
+    [RequestSizeLimit(32 * 1024)]
+    [ProducesResponseType<SyncMessagesResponse>(StatusCodes.Status200OK)]
+    public Task<SyncMessagesResponse> Sync(Guid dialogId, SyncMessagesRequest request, CancellationToken cancellationToken) =>
+        messages.SyncAsync(UserId, dialogId, request, cancellationToken);
+
     [HttpDelete("{messageId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(Guid dialogId, Guid messageId, [FromQuery] bool forEveryone = false, CancellationToken cancellationToken = default)

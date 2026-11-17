@@ -48,6 +48,7 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
                 new SendMessageResponse(copy is null ? null : ToResponse(copy), false, copy is null, dialog.MessageRevision), []);
         }
 
+        dialog.MessageRevision++;
         foreach (var ownerId in recipients)
         {
             context.Messages.Add(new Message
@@ -88,6 +89,17 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
         return new MessageHistoryResponse(items, next, dialog.MessageRevision);
     }
 
+    public async Task<SyncMessagesResponse> SyncAsync(Guid userId, Guid dialogId, Guid[] ids, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var dialog = await LockDialogAsync(userId, dialogId, cancellationToken);
+        var present = await context.Messages.AsNoTracking()
+            .Where(x => x.DialogId == dialogId && x.OwnerId == userId && ids.Contains(x.ClientMessageId))
+            .Select(x => x.ClientMessageId).ToListAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new SyncMessagesResponse(ids.Except(present).ToArray(), dialog.MessageRevision);
+    }
+
     public async Task<MessageDeleteResult> DeleteAsync(Guid userId, Guid dialogId, Guid messageId, bool forEveryone, CancellationToken cancellationToken = default)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -106,6 +118,7 @@ public sealed class MessageRepository(AppDbContext context, FileDeletionProcesso
             context.MessageReceipts.Add(ReceiptFor(rows[0], dialog.MessageRevision));
         var storageKeys = rows.SelectMany(x => x.Attachments).Select(x => x.StorageKey).Distinct().ToArray();
         context.Messages.RemoveRange(rows);
+        dialog.MessageRevision++;
         await context.SaveChangesAsync(cancellationToken);
         foreach (var key in storageKeys)
         {

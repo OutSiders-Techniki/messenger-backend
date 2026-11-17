@@ -27,6 +27,13 @@ public sealed class MessageService(IMessageRepository messages, IMessageEvents e
         return messages.GetHistoryAsync(userId, dialogId, limit, before, cancellationToken);
     }
 
+    public Task<SyncMessagesResponse> SyncAsync(Guid userId, Guid dialogId, SyncMessagesRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Ids is null || request.Ids.Length > MessageLimits.MaxSyncIds || request.Ids.Contains(Guid.Empty))
+            throw new ValidationException("Передайте не более 500 непустых идентификаторов сообщений.");
+        return messages.SyncAsync(userId, dialogId, request.Ids.Distinct().ToArray(), cancellationToken);
+    }
+
     public async Task DeleteAsync(Guid userId, Guid dialogId, Guid messageId, bool forEveryone, CancellationToken cancellationToken = default)
     {
         if (messageId == Guid.Empty)
