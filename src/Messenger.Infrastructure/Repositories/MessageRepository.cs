@@ -6,12 +6,13 @@ using Messenger.Application.Exceptions;
 using Messenger.Application.Interfaces;
 using Messenger.Domain.Entities;
 using Messenger.Infrastructure.Db;
+using Messenger.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Messenger.Infrastructure.Repositories;
 
 /// <summary>Все изменения и снимки истории сериализуются блокировкой строки диалога в PostgreSQL.</summary>
-public sealed class MessageRepository(AppDbContext context) : IMessageRepository
+public sealed class MessageRepository(AppDbContext context, FileDeletionProcessor cleanup) : IMessageRepository
 {
     public async Task<MessageSendResult> SendAsync(Guid userId, Guid dialogId, SendMessageRequest request, CancellationToken cancellationToken = default)
     {
@@ -85,6 +86,39 @@ public sealed class MessageRepository(AppDbContext context) : IMessageRepository
         var next = more ? EncodeCursor(rows[limit - 1]) : null;
         await transaction.CommitAsync(cancellationToken);
         return new MessageHistoryResponse(items, next, dialog.MessageRevision);
+    }
+
+    public async Task<MessageDeleteResult> DeleteAsync(Guid userId, Guid dialogId, Guid messageId, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var dialog = await LockDialogAsync(userId, dialogId, cancellationToken);
+        var rows = await context.Messages
+            .Where(x => x.DialogId == dialogId && x.ClientMessageId == messageId && x.OwnerId == userId)
+            .Include(x => x.Attachments).ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MessageDeleteResult(false, dialog.MessageRevision, []);
+        }
+
+        // Рецепт сохраняется до удаления последней рабочей копии, в том числе для старых данных.
+        if (!await context.MessageReceipts.AnyAsync(x => x.DialogId == dialogId && x.ClientMessageId == messageId, cancellationToken))
+            context.MessageReceipts.Add(ReceiptFor(rows[0], dialog.MessageRevision));
+        var storageKeys = rows.SelectMany(x => x.Attachments).Select(x => x.StorageKey).Distinct().ToArray();
+        context.Messages.RemoveRange(rows);
+        await context.SaveChangesAsync(cancellationToken);
+        foreach (var key in storageKeys)
+        {
+            // Файл может использовать оставшаяся копия: пока есть ссылка, он нужен.
+            if (!await context.Attachments.AnyAsync(x => x.StorageKey == key, cancellationToken)
+                && !await context.PendingFileDeletions.AnyAsync(x => x.StorageKey == key, cancellationToken))
+                context.PendingFileDeletions.Add(new PendingFileDeletion { StorageKey = key });
+        }
+        await context.SaveChangesAsync(cancellationToken);
+        IReadOnlyList<Guid> recipients = [userId];
+        await transaction.CommitAsync(cancellationToken);
+        await cleanup.ProcessAsync(cancellationToken);
+        return new MessageDeleteResult(true, dialog.MessageRevision, recipients);
     }
 
     private async Task<Dialog> LockDialogAsync(Guid userId, Guid dialogId, CancellationToken cancellationToken)

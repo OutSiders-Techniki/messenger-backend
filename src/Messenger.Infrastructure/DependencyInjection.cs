@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IAttachmentRepository, AttachmentRepository>();
         services.AddScoped<ISessionStore, SessionRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddScoped<FileDeletionProcessor>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 
         services.AddSingleton<IAttachmentContentStore>(provider =>

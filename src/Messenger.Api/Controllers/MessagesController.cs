@@ -43,5 +43,11 @@ public sealed class MessagesController(MessageService messages) : ControllerBase
     public Task<MessageHistoryResponse> History(Guid dialogId, [FromQuery] int limit = 50, [FromQuery] string? before = null, CancellationToken cancellationToken = default) =>
         messages.GetHistoryAsync(UserId, dialogId, limit, before, cancellationToken);
 
-
+    [HttpDelete("{messageId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Delete(Guid dialogId, Guid messageId, CancellationToken cancellationToken = default)
+    {
+        await messages.DeleteAsync(UserId, dialogId, messageId, cancellationToken);
+        return NoContent();
+    }
 }

@@ -17,6 +17,7 @@ public static class MessengerRealtimeExtensions
             options.MaximumReceiveMessageSize = 4096;
             options.AddFilter<SessionHubFilter>();
         });
+        services.AddHostedService<FileDeletionWorker>();
         return services;
     }
 

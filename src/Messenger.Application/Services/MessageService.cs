@@ -27,6 +27,15 @@ public sealed class MessageService(IMessageRepository messages, IMessageEvents e
         return messages.GetHistoryAsync(userId, dialogId, limit, before, cancellationToken);
     }
 
+    public async Task DeleteAsync(Guid userId, Guid dialogId, Guid messageId, CancellationToken cancellationToken = default)
+    {
+        if (messageId == Guid.Empty)
+            throw new ValidationException("Идентификатор сообщения не может быть пустым.");
+        var result = await messages.DeleteAsync(userId, dialogId, messageId, cancellationToken);
+        if (result.Changed)
+            await events.DeletedAsync(result.Recipients, new MessageDeletedEvent(dialogId, messageId, false, result.Revision), cancellationToken);
+    }
+
     public static void Validate(SendMessageRequest request)
     {
         if (request.Version != 1)
