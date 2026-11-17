@@ -8,6 +8,8 @@ using Messenger.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Messenger.Infrastructure.Db;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,7 +47,14 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-ValidateSessionOptions(app.Configuration);
+ValidateSessionOptions(app.Configuration, app.Environment);
+
+// Opt-in for the single-instance local Compose deployment; production can apply migrations separately.
+if (app.Configuration.GetValue<bool>("Database:ApplyMigrations"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+}
 
 // JSON-документ спецификации доступен во всех средах: фронтенду нужен
 // стабильный контракт. Интерактивный UI не отдаём.
@@ -81,7 +90,7 @@ app.Run();
 
 // Некорректная конфигурация cookie ломает безопасность молча,
 // поэтому падаем сразу при старте.
-static void ValidateSessionOptions(IConfiguration configuration)
+static void ValidateSessionOptions(IConfiguration configuration, IWebHostEnvironment environment)
 {
     var options = configuration
         .GetSection(SessionCookieOptions.SectionName)
@@ -96,6 +105,22 @@ static void ValidateSessionOptions(IConfiguration configuration)
     if (options.LifetimeHours <= 0)
     {
         throw new InvalidOperationException("Session:LifetimeHours должен быть больше нуля.");
+    }
+
+    if (!new[] { "Strict", "Lax", "None" }.Contains(options.SameSite, StringComparer.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException("Session:SameSite должен быть Strict, Lax или None.");
+    }
+
+    if (!environment.IsDevelopment() && !options.Secure)
+    {
+        throw new InvalidOperationException("Session:Secure должен быть true вне среды Development.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.CookieName) || options.CookieName.Any(character =>
+            !char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-'))
+    {
+        throw new InvalidOperationException("Session:CookieName содержит недопустимые символы.");
     }
 }
 
