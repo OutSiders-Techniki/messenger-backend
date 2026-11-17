@@ -7,6 +7,7 @@ using Messenger.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Messenger.Api.Controllers;
 
@@ -22,6 +23,8 @@ public class AuthController(
     /// сервер выдаёт публичный ID, по которому пользователя можно найти.
     /// </summary>
     [HttpPost("register")]
+    [EnableRateLimiting(SecurityConfiguration.AuthPolicy)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -36,6 +39,8 @@ public class AuthController(
 
     /// <summary>Вход по публичному ID и паролю. Устанавливает cookie-сессию.</summary>
     [HttpPost("login")]
+    [EnableRateLimiting(SecurityConfiguration.AuthPolicy)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LoginResponse>> Login(

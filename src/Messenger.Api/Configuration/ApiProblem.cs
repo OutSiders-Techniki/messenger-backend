@@ -24,6 +24,7 @@ public static class ApiProblem
         StatusCodes.Status409Conflict => TypeBase + "10",
         StatusCodes.Status413PayloadTooLarge => TypeBase + "14",
         StatusCodes.Status415UnsupportedMediaType => TypeBase + "16",
+        StatusCodes.Status429TooManyRequests => "https://www.rfc-editor.org/rfc/rfc6585#section-4",
         _ => "https://tools.ietf.org/html/rfc9110#section-15.6.1",
     };
 
@@ -55,6 +56,9 @@ public static class ApiProblem
         StatusCodes.Status415UnsupportedMediaType =>
             ("Неверный тип содержимого", "Ожидается запрос в формате JSON.",
                 ApiErrorCodes.UnsupportedMediaType),
+        StatusCodes.Status429TooManyRequests =>
+            ("Слишком много запросов", "Превышен лимит запросов. Повторите попытку позже.",
+                ApiErrorCodes.RateLimited),
         _ when status >= StatusCodes.Status500InternalServerError =>
             ("Внутренняя ошибка сервера", "Внутренняя ошибка сервера. Повторите попытку позже.",
                 ApiErrorCodes.InternalError),

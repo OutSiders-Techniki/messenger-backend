@@ -27,15 +27,18 @@ public static class DependencyInjection
         services.AddScoped<ISessionStore, SessionRepository>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 
-        var storageRoot = configuration[$"{AttachmentStorageOptions.SectionName}:RootPath"];
-
-        if (string.IsNullOrWhiteSpace(storageRoot))
+        services.AddSingleton<IAttachmentContentStore>(provider =>
         {
-            storageRoot = new AttachmentStorageOptions().RootPath;
-        }
+            var finalConfiguration = provider.GetRequiredService<IConfiguration>();
+            var storageRoot = finalConfiguration[$"{AttachmentStorageOptions.SectionName}:RootPath"];
 
-        services.AddSingleton<IAttachmentContentStore>(
-            new FileSystemAttachmentContentStore(storageRoot));
+            if (string.IsNullOrWhiteSpace(storageRoot))
+            {
+                storageRoot = new AttachmentStorageOptions().RootPath;
+            }
+
+            return new FileSystemAttachmentContentStore(storageRoot);
+        });
 
         return services;
     }

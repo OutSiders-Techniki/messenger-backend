@@ -38,6 +38,7 @@ public static class ApiOpenApiConfiguration
         ApiErrorCodes.DuplicateDialog,
         ApiErrorCodes.DuplicatePublicId,
         ApiErrorCodes.InternalError,
+        ApiErrorCodes.RateLimited,
     ];
 
     /// <summary>
@@ -329,6 +330,8 @@ public static class ApiOpenApiConfiguration
             $"Метод не поддерживается для этого адреса. Код: {ApiErrorCodes.MethodNotAllowed}.",
         StatusCodes.Status415UnsupportedMediaType =>
             $"Неверный тип содержимого запроса. Код: {ApiErrorCodes.UnsupportedMediaType}.",
+        StatusCodes.Status429TooManyRequests =>
+            $"Превышен лимит запросов. Код: {ApiErrorCodes.RateLimited}. Retry-After задаёт время ожидания в секундах.",
         _ =>
             $"Внутренняя ошибка сервера. Код: {ApiErrorCodes.InternalError}.",
     };

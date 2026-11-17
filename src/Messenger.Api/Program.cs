@@ -86,6 +86,7 @@ app.UseStatusCodePages(async (StatusCodeContext statusCodeContext) =>
 app.UseHttpsRedirection();
 app.UseMiddleware<SameOriginMiddleware>();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

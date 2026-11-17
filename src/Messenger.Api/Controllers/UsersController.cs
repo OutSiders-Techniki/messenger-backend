@@ -2,6 +2,8 @@ using Messenger.Application.DTOs;
 using Messenger.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Messenger.Api.Configuration;
 
 namespace Messenger.Api.Controllers;
 
@@ -15,6 +17,8 @@ public class UsersController(UserSearchService userSearch) : ControllerBase
     /// </summary>
     [Authorize]
     [HttpGet("by-id/{id}")]
+    [EnableRateLimiting(SecurityConfiguration.SearchPolicy)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     [ResponseCache(NoStore = true)]
     [ProducesResponseType<UserSearchResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -28,3 +32,4 @@ public class UsersController(UserSearchService userSearch) : ControllerBase
         return Ok(response);
     }
 }
+
