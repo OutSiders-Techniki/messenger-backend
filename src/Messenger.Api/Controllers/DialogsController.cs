@@ -84,6 +84,50 @@ public class DialogsController(DialogService dialogService) : ControllerBase
         return Ok(dialog);
     }
 
+    /// <summary>
+    /// Сохраняет подпись контакта для текущего пользователя. Тело —
+    /// зашифрованный ключом диалога пакет { v, iv, ct }; сервер его не
+    /// расшифровывает. Собеседник подпись не получает.
+    /// </summary>
+    [Authorize]
+    [HttpPut("{id:guid}/label")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SaveLabel(
+        Guid id,
+        [FromBody] PutLabelRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return BuildUnauthorized();
+        }
+
+        await dialogService.SaveLabelAsync(userId, id, request, cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>Удаляет подпись контакта текущего пользователя. Отсутствие подписи ошибкой не считается.</summary>
+    [Authorize]
+    [HttpDelete("{id:guid}/label")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteLabel(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return BuildUnauthorized();
+        }
+
+        await dialogService.DeleteLabelAsync(userId, id, cancellationToken);
+
+        return NoContent();
+    }
+
     private bool TryGetUserId(out Guid userId)
     {
         var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);

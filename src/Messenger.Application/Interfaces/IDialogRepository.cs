@@ -34,4 +34,14 @@ public interface IDialogRepository
         Guid dialogId,
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Сохраняет подпись контакта пользователя (upsert). Не участник получает DialogNotFoundException.</summary>
+    Task SaveLabelAsync(
+        Guid userId,
+        Guid dialogId,
+        PutLabelRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Удаляет подпись контакта пользователя; идемпотентно.</summary>
+    Task DeleteLabelAsync(Guid userId, Guid dialogId, CancellationToken cancellationToken = default);
 }

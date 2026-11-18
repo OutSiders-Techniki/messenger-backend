@@ -274,5 +274,26 @@ public class DialogServiceTests
 
             return Task.FromResult(result);
         }
+
+        public Task SaveLabelAsync(
+            Guid userId, Guid dialogId, PutLabelRequest request, CancellationToken cancellationToken = default)
+        {
+            var dialog = Dialogs.Single(d => d.Id == dialogId);
+            dialog.Labels.Add(new DialogLabel
+            {
+                DialogId = dialogId, OwnerId = userId,
+                Version = request.Version, Iv = request.Iv!, Ciphertext = request.Ciphertext!,
+                UpdatedAt = DateTime.UtcNow,
+            });
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteLabelAsync(Guid userId, Guid dialogId, CancellationToken cancellationToken = default)
+        {
+            var dialog = Dialogs.Single(d => d.Id == dialogId);
+            foreach (var label in dialog.Labels.Where(l => l.OwnerId == userId).ToList())
+                dialog.Labels.Remove(label);
+            return Task.CompletedTask;
+        }
     }
 }

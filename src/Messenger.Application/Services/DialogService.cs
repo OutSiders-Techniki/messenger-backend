@@ -70,4 +70,31 @@ public class DialogService(IUserRepository users, IDialogRepository dialogs)
 
         return dialog;
     }
+
+    /// <summary>
+    /// Сохраняет подпись контакта. Сервер не расшифровывает пакет: проверяются
+    /// только формат криптопакета и размер шифротекста.
+    /// </summary>
+    public Task SaveLabelAsync(
+        Guid userId, Guid dialogId, PutLabelRequest request, CancellationToken cancellationToken = default)
+    {
+        ValidateLabel(request);
+        return dialogs.SaveLabelAsync(userId, dialogId, request, cancellationToken);
+    }
+
+    /// <summary>Удаляет подпись контакта; повторное удаление тоже возвращает успех.</summary>
+    public Task DeleteLabelAsync(Guid userId, Guid dialogId, CancellationToken cancellationToken = default) =>
+        dialogs.DeleteLabelAsync(userId, dialogId, cancellationToken);
+
+    private static void ValidateLabel(PutLabelRequest request)
+    {
+        if (request is null)
+            throw new ValidationException("Укажите пакет подписи.");
+        if (request.Version != 1)
+            throw new ValidationException("Поддерживается только версия криптопакета 1.");
+        if (request.Iv is not { Length: 12 })
+            throw new ValidationException("IV AES-GCM должен содержать ровно 12 байт.");
+        if (request.Ciphertext is null || request.Ciphertext.Length is < 16 or > 512)
+            throw new ValidationException("Шифротекст с тегом должен содержать от 16 до 512 байт.");
+    }
 }

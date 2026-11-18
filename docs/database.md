@@ -16,6 +16,8 @@ erDiagram
     users ||--o{ sessions : ""
     dialogs ||--o{ message_receipts : ""
     dialogs ||--o{ message_deletions : ""
+    dialogs ||--o{ dialog_labels : ""
+    users ||--o{ dialog_labels : "owner_id"
     dialogs ||--o{ pending_file_deletions : ""
 
     users {
@@ -87,6 +89,15 @@ erDiagram
         uuid owner_id PK,FK
         timestamptz deleted_at
     }
+
+    dialog_labels {
+        uuid dialog_id PK,FK
+        uuid owner_id PK,FK
+        int version "v криптопакета"
+        bytea iv "12 байт"
+        bytea ciphertext "с тегом, до 512 байт"
+        timestamptz updated_at
+    }
 ```
 
 ## Две копии сообщения
@@ -116,6 +127,15 @@ SHA-256 отпечаток пакета и ревизия диалога. Шиф
 «удалить у обоих» сообщение не воскресает вовсе — отправитель получает ответ
 200 `deleted=true`. Как и квитанции, отметки хранятся постоянно.
 
+## Подписи контактов (dialog_labels)
+
+Зашифрованная ключом диалога подпись контакта («Иван, бухгалтерия»), видимая
+только владельцу: PK (dialog_id, owner_id), собеседник записи не получает.
+Сервер хранит только шифротекст и не может прочитать подпись; проверяет лишь
+формат пакета (IV 12 байт, шифротекст с тегом до 512 байт). Удаляется каскадно
+вместе с диалогом и учётной записью владельца. Текст подписи не хранится
+нигде — расшифровка невозможна без ключа диалога.
+
 ## Очередь удаления файлов (pending_file_deletions)
 
 Задание на удаление файла вложения создаётся в той же транзакции, что и
@@ -142,6 +162,7 @@ SHA-256 отпечаток пакета и ревизия диалога. Шиф
 | `messages(dialog_id, owner_id, sent_at)`                  | постраничная загрузка истории                      |
 | `messages(dialog_id, owner_id, sent_at, client_message_id)` | keyset-пагинация при одинаковых метках времени    |
 | `message_deletions` PK `(dialog_id, client_message_id, owner_id)` | повторное удаление идемпотентно             |
+| `dialog_labels` PK `(dialog_id, owner_id)`                        | одна подпись на пару «диалог—владелец»      |
 | `ck_messages_iv_length`: `length(iv) = 12`                | IV AES-256-GCM 96 бит                              |
 | `ck_attachments_size`: `0 < size <= 25000000`             | лимит 25 МБ на вложение                            |
 | `ck_attachments_client_id`                                | идентификатор вложения не может быть пустым        |

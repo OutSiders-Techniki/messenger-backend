@@ -112,8 +112,9 @@ public class DialogRepository(AppDbContext context) : IDialogRepository
     }
 
     /// <summary>
-    /// Проекция диалога в элемент списка: собеседник — второй участник.
-    /// Общая для выборки списка и открытия диалога.
+    /// Проекция диалога в элемент списка: собеседник — второй участник,
+    /// подпись — своя (owner_id = пользователь запроса). Общая для выборки
+    /// списка и открытия диалога.
     /// </summary>
     private static Expression<Func<Dialog, DialogListItem>> CompanionProjection(Guid userId) =>
         dialog => new DialogListItem(
@@ -122,7 +123,53 @@ public class DialogRepository(AppDbContext context) : IDialogRepository
                 .Where(p => p.UserId != userId)
                 .Select(p => p.User.PublicId)
                 .FirstOrDefault()!,
-            dialog.CreatedAt);
+            dialog.CreatedAt,
+            dialog.Labels
+                .Where(l => l.OwnerId == userId)
+                .Select(l => new DialogLabelView(l.Version, l.Iv, l.Ciphertext, l.UpdatedAt))
+                .FirstOrDefault());
+
+    /// <summary>
+    /// Сохраняет подпись контакта (upsert одним INSERT ... ON CONFLICT):
+    /// конкурентные сохранения одного владельца не конфликтуют на PK.
+    /// Подпись принадлежит владельцу, перезапись чужой подписи невозможна
+    /// по PK (dialog_id, owner_id).
+    /// </summary>
+    public async Task SaveLabelAsync(
+        Guid userId, Guid dialogId, PutLabelRequest request, CancellationToken cancellationToken = default)
+    {
+        var isParticipant = await context.DialogParticipants
+            .AnyAsync(p => p.DialogId == dialogId && p.UserId == userId, cancellationToken);
+
+        if (!isParticipant)
+        {
+            throw new DialogNotFoundException();
+        }
+
+        var now = DateTime.UtcNow;
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO dialog_labels (dialog_id, owner_id, version, iv, ciphertext, updated_at)
+            VALUES ({dialogId}, {userId}, {request.Version}, {request.Iv}, {request.Ciphertext}, {now})
+            ON CONFLICT (dialog_id, owner_id) DO UPDATE
+            SET version = {request.Version}, iv = {request.Iv}, ciphertext = {request.Ciphertext}, updated_at = {now}
+            """, cancellationToken);
+    }
+
+    /// <summary>Удаляет подпись контакта. Отсутствие подписи ошибкой не является.</summary>
+    public async Task DeleteLabelAsync(Guid userId, Guid dialogId, CancellationToken cancellationToken = default)
+    {
+        var isParticipant = await context.DialogParticipants
+            .AnyAsync(p => p.DialogId == dialogId && p.UserId == userId, cancellationToken);
+
+        if (!isParticipant)
+        {
+            throw new DialogNotFoundException();
+        }
+
+        await context.DialogLabels
+            .Where(l => l.DialogId == dialogId && l.OwnerId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 
     private Task<Dialog?> FindByPairKeyAsync(string pairKey, CancellationToken cancellationToken)
     {

@@ -102,6 +102,43 @@ namespace Messenger.Infrastructure.Migrations
                     b.ToTable("dialogs", (string)null);
                 });
 
+            modelBuilder.Entity("Messenger.Domain.Entities.DialogLabel", b =>
+                {
+                    b.Property<Guid>("DialogId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dialog_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<byte[]>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<byte[]>("Iv")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("iv");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("DialogId", "OwnerId")
+                        .HasName("pk_dialog_labels");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_dialog_labels_owner_id");
+
+                    b.ToTable("dialog_labels", (string)null);
+                });
+
             modelBuilder.Entity("Messenger.Domain.Entities.DialogParticipant", b =>
                 {
                     b.Property<Guid>("DialogId")
@@ -348,6 +385,23 @@ namespace Messenger.Infrastructure.Migrations
                     b.Navigation("Message");
                 });
 
+            modelBuilder.Entity("Messenger.Domain.Entities.DialogLabel", b =>
+                {
+                    b.HasOne("Messenger.Domain.Entities.Dialog", null)
+                        .WithMany("Labels")
+                        .HasForeignKey("DialogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dialog_labels_dialogs_dialog_id");
+
+                    b.HasOne("Messenger.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dialog_labels_users_owner_id");
+                });
+
             modelBuilder.Entity("Messenger.Domain.Entities.DialogParticipant", b =>
                 {
                     b.HasOne("Messenger.Domain.Entities.Dialog", "Dialog")
@@ -447,6 +501,8 @@ namespace Messenger.Infrastructure.Migrations
 
             modelBuilder.Entity("Messenger.Domain.Entities.Dialog", b =>
                 {
+                    b.Navigation("Labels");
+
                     b.Navigation("Messages");
 
                     b.Navigation("Participants");

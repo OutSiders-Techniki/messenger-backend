@@ -14,6 +14,7 @@ public class Dialog
 
     public ICollection<DialogParticipant> Participants { get; set; } = new List<DialogParticipant>();
     public ICollection<Message> Messages { get; set; } = new List<Message>();
+    public ICollection<DialogLabel> Labels { get; set; } = new List<DialogLabel>();
 
     /// <summary>
     /// Ключ пары участников в отсортированном порядке: диалог между A и B
