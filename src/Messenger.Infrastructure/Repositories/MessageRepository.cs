@@ -48,8 +48,21 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
                 new SendMessageResponse(copy is null ? null : ToResponse(copy), false, copy is null, dialog.MessageRevision), []);
         }
 
+        // Удаление могло прийти раньше пакета (переупорядочивание, ретрай):
+        // отметки об удалённых копиях не дают поздней отправке воскресить их.
+        var deletedOwners = await context.MessageDeletions
+            .Where(x => x.DialogId == dialogId && x.ClientMessageId == request.Id)
+            .Select(x => x.OwnerId).ToListAsync(cancellationToken);
+        var ownersToCreate = recipients.Where(x => !deletedOwners.Contains(x)).ToArray();
+        if (ownersToCreate.Length == 0)
+        {
+            // Все копии удалены до прихода пакета: сообщение не создаётся.
+            await transaction.CommitAsync(cancellationToken);
+            return new MessageSendResult(new SendMessageResponse(null, false, true, dialog.MessageRevision), [], null);
+        }
+
         dialog.MessageRevision++;
-        foreach (var ownerId in recipients)
+        foreach (var ownerId in ownersToCreate)
         {
             context.Messages.Add(new Message
             {
@@ -67,7 +80,11 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         var packet = new MessageResponse(dialogId, senderPublicId, request.Version, request.Id, request.SentAt, request.Iv!, request.Ciphertext!);
-        return new MessageSendResult(new SendMessageResponse(packet, true, false, dialog.MessageRevision), recipients);
+        // Своей копии у отправителя может не быть: она удалена раньше пакета.
+        var senderHasCopy = ownersToCreate.Contains(userId);
+        return new MessageSendResult(
+            new SendMessageResponse(senderHasCopy ? packet : null, true, !senderHasCopy, dialog.MessageRevision),
+            ownersToCreate, packet);
     }
 
     public async Task<MessageHistoryResponse> GetHistoryAsync(Guid userId, Guid dialogId, int limit, string? before, CancellationToken cancellationToken = default)
@@ -123,8 +140,13 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
         var rows = await context.Messages
             .Where(x => x.DialogId == dialogId && x.ClientMessageId == messageId && (forEveryone || x.OwnerId == userId))
             .Include(x => x.Attachments).ToListAsync(cancellationToken);
+        var participants = forEveryone ? await ParticipantIdsAsync(dialogId, cancellationToken) : [userId];
         if (rows.Count == 0)
         {
+            // Удаление пришло раньше пакета отправки: отметка не даст поздней
+            // отправке воскресить копию.
+            await RecordDeletionsAsync(dialogId, [messageId], participants, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new MessageDeleteResult(false, dialog.MessageRevision, []);
         }
@@ -132,6 +154,7 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
         // Рецепт сохраняется до удаления последней рабочей копии, в том числе для старых данных.
         if (!await context.MessageReceipts.AnyAsync(x => x.DialogId == dialogId && x.ClientMessageId == messageId, cancellationToken))
             context.MessageReceipts.Add(ReceiptFor(rows[0], dialog.MessageRevision));
+        await RecordDeletionsAsync(dialogId, [messageId], participants, cancellationToken);
         var storageKeys = rows.SelectMany(x => x.Attachments).Select(x => x.StorageKey).Distinct().ToArray();
         context.Messages.RemoveRange(rows);
         dialog.MessageRevision++;
@@ -144,7 +167,7 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
                 context.PendingFileDeletions.Add(new PendingFileDeletion { StorageKey = key });
         }
         await context.SaveChangesAsync(cancellationToken);
-        var recipients = forEveryone ? await ParticipantIdsAsync(dialogId, cancellationToken) : [userId];
+        var recipients = forEveryone ? participants : [userId];
         await transaction.CommitAsync(cancellationToken);
         await cleanup.ProcessAsync(cancellationToken);
         return new MessageDeleteResult(true, dialog.MessageRevision, recipients);
@@ -163,6 +186,25 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
 
     private async Task<List<Guid>> ParticipantIdsAsync(Guid dialogId, CancellationToken cancellationToken) =>
         await context.DialogParticipants.Where(x => x.DialogId == dialogId).Select(x => x.UserId).ToListAsync(cancellationToken);
+
+    /// <summary>
+    /// Фиксирует удаление копий сообщений. Отметка остаётся и после физического
+    /// удаления строк: поздняя отправка с тем же идентификатором не воскресит копию.
+    /// </summary>
+    private async Task RecordDeletionsAsync(
+        Guid dialogId, Guid[] clientMessageIds, IReadOnlyList<Guid> ownerIds, CancellationToken cancellationToken)
+    {
+        var pairs = ownerIds.SelectMany(o => clientMessageIds.Select(m => (MessageId: m, OwnerId: o))).ToHashSet();
+        var existing = await context.MessageDeletions
+            .Where(x => x.DialogId == dialogId && clientMessageIds.Contains(x.ClientMessageId) && ownerIds.Contains(x.OwnerId))
+            .Select(x => new { x.ClientMessageId, x.OwnerId }).ToListAsync(cancellationToken);
+        foreach (var pair in existing)
+            pairs.Remove((pair.ClientMessageId, pair.OwnerId));
+        context.MessageDeletions.AddRange(pairs.Select(p => new MessageDeletion
+        {
+            DialogId = dialogId, ClientMessageId = p.MessageId, OwnerId = p.OwnerId, DeletedAt = DateTime.UtcNow,
+        }));
+    }
 
     private static MessageResponse ToResponse(Message row) => new(
         row.DialogId, row.Sender.PublicId, row.Version, row.ClientMessageId,

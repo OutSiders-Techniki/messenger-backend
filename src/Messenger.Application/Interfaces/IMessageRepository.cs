@@ -2,7 +2,13 @@ using Messenger.Application.DTOs;
 
 namespace Messenger.Application.Interfaces;
 
-public sealed record MessageSendResult(SendMessageResponse Response, IReadOnlyList<Guid> Recipients);
+/// <param name="Response">Ответ клиенту: что произошло с отправкой.</param>
+/// <param name="Recipients">Участники, у которых появилась копия сообщения.</param>
+/// <param name="Packet">Пакет для realtime-события; null, если копий не появилось.</param>
+public sealed record MessageSendResult(
+    SendMessageResponse Response,
+    IReadOnlyList<Guid> Recipients,
+    MessageResponse? Packet = null);
 public sealed record MessageDeleteResult(bool Changed, long Revision, IReadOnlyList<Guid> Recipients);
 
 public interface IMessageRepository

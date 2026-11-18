@@ -25,6 +25,14 @@ public sealed partial class MessageRepository
         var rows = await query.Include(x => x.Attachments).ToListAsync(cancellationToken);
         if (rows.Count == 0)
         {
+            // Удаление пришло раньше пакетов отправки: отметки не дадут поздней
+            // отправке воскресить копии.
+            if (messageIds is not null)
+            {
+                await RecordDeletionsAsync(dialogId, messageIds,
+                    forEveryone ? await ParticipantIdsAsync(dialogId, cancellationToken) : [userId], cancellationToken);
+                await context.SaveChangesAsync(cancellationToken);
+            }
             await transaction.CommitAsync(cancellationToken);
             return new MessageBatchDeleteResult([], []);
         }
@@ -44,6 +52,11 @@ public sealed partial class MessageRepository
                 context.MessageReceipts.Add(ReceiptFor(firstCopyById[id], dialog.MessageRevision));
             deletedEvents.Add(new MessageDeletedEvent(dialogId, id, forEveryone, dialog.MessageRevision));
         }
+
+        // Отметки об удалении нужны и для уже удалённых копий: поздняя отправка
+        // с тем же идентификатором не должна воскресить переписку.
+        await RecordDeletionsAsync(dialogId, ids,
+            forEveryone ? await ParticipantIdsAsync(dialogId, cancellationToken) : [userId], cancellationToken);
 
         var storageKeys = rows.SelectMany(x => x.Attachments).Select(x => x.StorageKey).Distinct().ToArray();
         context.Messages.RemoveRange(rows);

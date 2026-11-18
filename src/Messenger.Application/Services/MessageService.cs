@@ -10,10 +10,10 @@ public sealed class MessageService(IMessageRepository messages, IMessageEvents e
     {
         Validate(request);
         var result = await messages.SendAsync(userId, dialogId, request, cancellationToken);
-        if (result.Response.Created)
+        if (result.Response.Created && result.Packet is not null)
         {
             await events.ReceivedAsync(result.Recipients,
-                new MessageReceivedEvent(result.Response.Message!, result.Response.Revision), cancellationToken);
+                new MessageReceivedEvent(result.Packet, result.Response.Revision), cancellationToken);
         }
         return result.Response;
     }

@@ -45,7 +45,7 @@ public sealed class MessageServiceTests
         var peerId = Guid.NewGuid();
         var dialogId = Guid.NewGuid();
         var response = new MessageResponse(dialogId, "TESTUSER", packet.Version, packet.Id, packet.SentAt, packet.Iv!, packet.Ciphertext!);
-        var repository = new StubRepository { SendResult = new(new(response, true, false, 7), [userId, peerId]) };
+        var repository = new StubRepository { SendResult = new(new(response, true, false, 7), [userId, peerId], response) };
         var events = new StubEvents();
         var service = new MessageService(repository, events);
 

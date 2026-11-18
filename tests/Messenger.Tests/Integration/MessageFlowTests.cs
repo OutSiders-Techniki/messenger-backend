@@ -145,6 +145,48 @@ public class MessageFlowTests(MessengerApiFactory factory) : IClassFixture<Messe
     }
 
     [SkippableFact]
+    public async Task DeletionArrivingBeforeSend_DoesNotResurrectCopies()
+    {
+        var setup = await SetupAsync();
+        var packet = Packet();
+        // Удаление добирается до сервера раньше пакета: сообщения ещё нет.
+        await DeleteForEveryoneAsync(setup.B, setup.DialogId, packet.Id);
+        using var send = await setup.A.Client.PostAsJsonAsync(
+            $"/dialogs/{setup.DialogId}/messages", packet);
+        Assert.Equal(HttpStatusCode.OK, send.StatusCode);
+        var body = await JsonAsync(send);
+        Assert.False(body.GetProperty("created").GetBoolean());
+        Assert.True(body.GetProperty("deleted").GetBoolean());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, body.GetProperty("message").ValueKind);
+        await InDatabaseAsync(async db =>
+        {
+            Assert.False(await db.Messages.AnyAsync(m => m.DialogId == setup.DialogId));
+            Assert.False(await db.MessageReceipts.AnyAsync(r => r.DialogId == setup.DialogId));
+        });
+        Assert.Empty((await HistoryAsync(setup.A, setup.DialogId)).GetProperty("items").EnumerateArray());
+        Assert.Empty((await HistoryAsync(setup.B, setup.DialogId)).GetProperty("items").EnumerateArray());
+    }
+
+    [SkippableFact]
+    public async Task OwnCopyDeletionArrivingBeforeSend_KeepsPeerCopyOnly()
+    {
+        var setup = await SetupAsync();
+        var packet = Packet();
+        await setup.A.Client.DeleteAsync($"/dialogs/{setup.DialogId}/messages/{packet.Id}");
+        var sent = await SendAsync(setup.A, setup.DialogId, packet);
+        Assert.True(sent.GetProperty("created").GetBoolean());
+        Assert.True(sent.GetProperty("deleted").GetBoolean());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, sent.GetProperty("message").ValueKind);
+        await InDatabaseAsync(async db =>
+        {
+            var row = Assert.Single(await db.Messages.Where(m => m.DialogId == setup.DialogId).ToListAsync());
+            Assert.Equal(setup.B.Id, row.OwnerId);
+        });
+        Assert.Empty((await HistoryAsync(setup.A, setup.DialogId)).GetProperty("items").EnumerateArray());
+        Assert.Single((await HistoryAsync(setup.B, setup.DialogId)).GetProperty("items").EnumerateArray());
+    }
+
+    [SkippableFact]
     public async Task History_KeysetPaginationHasNoDuplicatesAtIdenticalTimestamps()
     {
         var setup = await SetupAsync();

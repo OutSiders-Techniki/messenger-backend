@@ -83,7 +83,8 @@
 
 - `POST /dialogs/{dialogId}/messages` — отправка криптопакета
   `{v, id, sentAt, iv, ct}`. Новое сообщение — `201`, идемпотентный
-  повтор — `200`, конфликт — `409 message_conflict`. Требует сессии.
+  повтор или отправка уже удалённого сообщения — `200` с флагом
+  `deleted=true`, конфликт — `409 message_conflict`. Требует сессии.
 - `GET /dialogs/{dialogId}/messages?limit=50&before=<cursor>` (алиас
   `beforeId`) — история своей копии, keyset-пагинация, до 100 на страницу.
 - `POST /dialogs/{dialogId}/messages/sync` — до 500 ID, ответ
