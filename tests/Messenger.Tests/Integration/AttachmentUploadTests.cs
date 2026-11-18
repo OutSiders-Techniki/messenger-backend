@@ -223,6 +223,43 @@ public class AttachmentUploadTests(MessengerApiFactory factory) : IClassFixture<
     }
 
     [SkippableFact]
+    public async Task Upload_FromSender_SharesContentWithExistingRecipientCopy()
+    {
+        await EnsureDatabaseAsync();
+
+        using var sender = factory.CreateClient();
+        using var recipient = factory.CreateClient();
+        var senderId = await RegisterAsync(sender);
+        var recipientId = await RegisterAsync(recipient);
+        await LoginAsync(sender, senderId);
+        await LoginAsync(recipient, recipientId);
+
+        var seeded = await SeedMessageCopyAsync(senderId, recipientId, includeRecipientCopy: true);
+        var attachmentId = Guid.NewGuid();
+        byte[] content = [10, 20, 30];
+        var upload = await UploadAsync(sender, seeded, attachmentId, content, [7]);
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+
+        var messagePath = $"/dialogs/{seeded.DialogId}/messages";
+        var filePath = $"{messagePath}/{seeded.ClientMessageId}/attachments/{attachmentId}/content";
+        var download = await recipient.GetAsync(filePath);
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal(content, await download.Content.ReadAsByteArrayAsync());
+        var deniedUpload = await UploadAsync(recipient, seeded, Guid.NewGuid(), content, [7]);
+        Assert.Equal(HttpStatusCode.NotFound, deniedUpload.StatusCode);
+
+        var ids = new { messageIds = new[] { seeded.ClientMessageId } };
+        var deleteSender = await sender.PostAsJsonAsync($"{messagePath}/delete-self", ids);
+        Assert.Equal(HttpStatusCode.NoContent, deleteSender.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await sender.GetAsync(filePath)).StatusCode);
+        Assert.Equal(content, await recipient.GetByteArrayAsync(filePath));
+
+        var deleteRecipient = await recipient.PostAsJsonAsync($"{messagePath}/delete-self", ids);
+        Assert.Equal(HttpStatusCode.NoContent, deleteRecipient.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await recipient.GetAsync(filePath)).StatusCode);
+    }
+
+    [SkippableFact]
     public async Task Download_FromForeignCopy_ReturnsNotFound()
     {
         await EnsureDatabaseAsync();
@@ -290,7 +327,8 @@ public class AttachmentUploadTests(MessengerApiFactory factory) : IClassFixture<
     /// </summary>
     private async Task<SeededMessage> SeedMessageCopyAsync(
         string ownerPublicId,
-        string companionPublicId)
+        string companionPublicId,
+        bool includeRecipientCopy = false)
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -340,6 +378,24 @@ public class AttachmentUploadTests(MessengerApiFactory factory) : IClassFixture<
         };
 
         context.Messages.Add(message);
+        if (includeRecipientCopy)
+        {
+            context.Messages.Add(new Message
+            {
+                Id = Guid.NewGuid(),
+                DialogId = dialog.Id,
+                SenderId = owner.Id,
+                OwnerId = companion.Id,
+                ClientMessageId = clientMessageId,
+                Version = message.Version,
+                SentAt = message.SentAt,
+                Iv = message.Iv,
+                Ciphertext = message.Ciphertext,
+                Dialog = dialog,
+                Sender = owner,
+                Owner = companion,
+            });
+        }
         await context.SaveChangesAsync();
 
         return new SeededMessage(dialog.Id, clientMessageId);

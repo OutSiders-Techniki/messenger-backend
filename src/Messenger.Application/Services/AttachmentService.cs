@@ -101,7 +101,7 @@ public class AttachmentService(
     }
 
     /// <summary>
-    /// Загружает зашифрованные байты вложения в свою копию сообщения.
+    /// Принимает загрузку от отправителя и привязывает байты к существующим копиям сообщения.
     /// Сервер сохраняет только ciphertext и зашифрованные клиентом
     /// метаданные: имя файла и тип содержимого сюда не попадают и MIME
     /// клиента не считается доверенным.
@@ -164,7 +164,7 @@ public class AttachmentService(
 
         if (stored.Size == 0)
         {
-            await contentStore.DeleteAsync(stored.StorageKey, cancellationToken);
+            await contentStore.DeleteAsync(stored.StorageKey, CancellationToken.None);
 
             throw new ValidationException("Файл вложения пуст.");
         }
@@ -187,7 +187,7 @@ public class AttachmentService(
         catch
         {
             // Строка не записалась — файл тоже не оставляем.
-            await contentStore.DeleteAsync(stored.StorageKey, cancellationToken);
+            await contentStore.DeleteAsync(stored.StorageKey, CancellationToken.None);
 
             throw;
         }

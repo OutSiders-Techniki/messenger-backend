@@ -74,7 +74,8 @@ public class AttachmentRepository(AppDbContext context) : IAttachmentRepository
             .Where(m =>
                 m.DialogId == dialogId
                 && m.ClientMessageId == clientMessageId
-                && m.OwnerId == userId)
+                && m.OwnerId == userId
+                && m.SenderId == userId)
             .Select(m => (Guid?)m.Id)
             .SingleOrDefaultAsync(cancellationToken);
     }
@@ -120,18 +121,46 @@ public class AttachmentRepository(AppDbContext context) : IAttachmentRepository
         Attachment attachment,
         CancellationToken cancellationToken = default)
     {
-        context.Attachments.Add(attachment);
+        var source = await context.Messages.AsNoTracking()
+            .Where(m => m.Id == attachment.MessageId)
+            .Select(m => new { m.DialogId, m.OwnerId, m.ClientMessageId })
+            .SingleOrDefaultAsync(cancellationToken) ?? throw new AttachmentNotFoundException();
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        // Та же блокировка диалога, что при удалении сообщений.
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT id FROM dialogs WHERE id = {source.DialogId} FOR UPDATE", cancellationToken);
+        var copies = await context.Messages.AsNoTracking()
+            .Where(m => m.DialogId == source.DialogId && m.ClientMessageId == source.ClientMessageId
+                && m.SenderId == source.OwnerId)
+            .Select(m => m.Id)
+            .ToListAsync(cancellationToken);
+        if (!copies.Contains(attachment.MessageId))
+            throw new AttachmentNotFoundException();
+
+        foreach (var id in copies)
+        {
+            context.Attachments.Add(new Attachment
+            {
+                Id = Guid.NewGuid(),
+                MessageId = id,
+                ClientAttachmentId = attachment.ClientAttachmentId,
+                StorageKey = attachment.StorageKey,
+                Size = attachment.Size,
+                EncryptedMetadata = attachment.EncryptedMetadata,
+                UploadedAt = attachment.UploadedAt,
+            });
+        }
 
         try
         {
             await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(CancellationToken.None);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {
             // Клиентский идентификатор вложения уникален в копии сообщения:
             // повторная загрузка — конфликт, а не новое вложение.
-            context.Entry(attachment).State = EntityState.Detached;
-
             throw new DuplicateAttachmentException();
         }
     }
