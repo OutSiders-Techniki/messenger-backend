@@ -169,7 +169,16 @@ public class AttachmentsController(AttachmentService attachmentService) : Contro
             clientAttachmentId,
             cancellationToken);
 
-        return File(content, "application/octet-stream", enableRangeProcessing: false);
+        try
+        {
+            return File(content, "application/octet-stream", enableRangeProcessing: false);
+        }
+        catch
+        {
+            // До начала потоковой передачи ответ не дошёл: закрываем файл сразу.
+            await content.DisposeAsync();
+            throw;
+        }
     }
 
     private static byte[] DecodeMetadata(string? encryptedMetadata)

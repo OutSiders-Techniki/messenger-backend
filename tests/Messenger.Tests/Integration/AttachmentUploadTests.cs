@@ -220,6 +220,8 @@ public class AttachmentUploadTests(MessengerApiFactory factory) : IClassFixture<
 
         Assert.Equal(HttpStatusCode.OK, download.StatusCode);
         Assert.Equal(await download.Content.ReadAsByteArrayAsync(), content);
+        // Байты вложения не должны попадать в кэш браузера.
+        Assert.True(download.Headers.CacheControl.NoStore);
     }
 
     [SkippableFact]

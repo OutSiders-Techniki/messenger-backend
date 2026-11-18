@@ -93,11 +93,7 @@ public class FileSystemAttachmentContentStore : IAttachmentContentStore
 
     public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(storageKey))
-        {
-            throw new InvalidOperationException("Некорректный ключ файлового хранилища.");
-        }
-
+        // Пустой и произвольный ключи отвергает ValidateKey.
         ValidateKey(storageKey);
 
         var path = Path.Combine(_rootPath, storageKey);
