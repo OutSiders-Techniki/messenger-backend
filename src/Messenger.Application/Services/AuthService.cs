@@ -73,7 +73,7 @@ public class AuthService(
             return null;
         }
 
-        return new CurrentUserResponse(user.PublicId, user.CreatedAt, user.Id);
+        return new CurrentUserResponse(user.PublicId, user.CreatedAt);
     }
 
     private string GetDummyHash()

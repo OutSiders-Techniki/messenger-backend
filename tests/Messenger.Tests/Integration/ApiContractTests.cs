@@ -77,7 +77,7 @@ public class ApiContractTests(MessengerApiFactory factory) : IClassFixture<Messe
     }
 
     [Fact]
-    public async Task OpenApiDocument_CurrentUserIdentifierHasUuidSchema()
+    public async Task OpenApiDocument_CurrentUserResponseDoesNotExposeInternalId()
     {
         using var client = factory.CreateClient();
         using var response = await client.GetAsync("/openapi/v1.json");
@@ -86,11 +86,9 @@ public class ApiContractTests(MessengerApiFactory factory) : IClassFixture<Messe
         var document = await response.Content.ReadFromJsonAsync<JsonElement>();
         var currentUser = document.GetProperty("components").GetProperty("schemas")
             .GetProperty("CurrentUserResponse");
-        var identifier = currentUser.GetProperty("properties").GetProperty("id");
 
-        Assert.Equal("string", identifier.GetProperty("type").GetString());
-        Assert.Equal("uuid", identifier.GetProperty("format").GetString());
-        Assert.Contains("id", currentUser.GetProperty("required").EnumerateArray().Select(x => x.GetString()));
+        Assert.False(currentUser.GetProperty("properties").TryGetProperty("id", out _));
+        Assert.Contains("publicId", currentUser.GetProperty("required").EnumerateArray().Select(x => x.GetString()));
     }
 
     [Fact]
