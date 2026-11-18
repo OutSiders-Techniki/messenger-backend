@@ -25,17 +25,24 @@ public static class DependencyInjection
         services.AddScoped<IDialogRepository, DialogRepository>();
         services.AddScoped<IAttachmentRepository, AttachmentRepository>();
         services.AddScoped<ISessionStore, SessionRepository>();
+        services.AddScoped<MessageRepository>();
+        services.AddScoped<IMessageRepository>(provider => provider.GetRequiredService<MessageRepository>());
+        services.AddScoped<IMessageBatchRepository>(provider => provider.GetRequiredService<MessageRepository>());
+        services.AddScoped<FileDeletionProcessor>();
         services.AddSingleton<IPasswordHasher, Argon2IdPasswordHasher>();
 
-        var storageRoot = configuration[$"{AttachmentStorageOptions.SectionName}:RootPath"];
-
-        if (string.IsNullOrWhiteSpace(storageRoot))
+        services.AddSingleton<IAttachmentContentStore>(provider =>
         {
-            storageRoot = new AttachmentStorageOptions().RootPath;
-        }
+            var finalConfiguration = provider.GetRequiredService<IConfiguration>();
+            var storageRoot = finalConfiguration[$"{AttachmentStorageOptions.SectionName}:RootPath"];
 
-        services.AddSingleton<IAttachmentContentStore>(
-            new FileSystemAttachmentContentStore(storageRoot));
+            if (string.IsNullOrWhiteSpace(storageRoot))
+            {
+                storageRoot = new AttachmentStorageOptions().RootPath;
+            }
+
+            return new FileSystemAttachmentContentStore(storageRoot);
+        });
 
         return services;
     }

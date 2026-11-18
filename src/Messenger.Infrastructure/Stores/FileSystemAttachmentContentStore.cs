@@ -82,7 +82,16 @@ public class FileSystemAttachmentContentStore : IAttachmentContentStore
             return Task.CompletedTask;
         }
 
-        TryDelete(Path.Combine(_rootPath, storageKey));
+        // Ключи выдаёт только это хранилище. Произвольный путь из БД не является разрешением удалить файл.
+        if (storageKey.Length != 36 || !storageKey.EndsWith(".bin", StringComparison.Ordinal)
+            || !Guid.TryParseExact(storageKey[..32], "N", out _))
+            throw new InvalidOperationException("Некорректный ключ файлового хранилища.");
+
+        var path = Path.Combine(_rootPath, storageKey);
+        if (new FileInfo(path).LinkTarget is not null)
+            throw new InvalidOperationException("Символические ссылки в хранилище не поддерживаются.");
+        // Не скрываем ошибку: транзакционная очередь сохранит задание для следующей попытки.
+        File.Delete(path);
 
         return Task.CompletedTask;
     }

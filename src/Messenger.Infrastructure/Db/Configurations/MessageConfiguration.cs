@@ -37,6 +37,7 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
 
         // Постраничная загрузка истории
         builder.HasIndex(m => new { m.DialogId, m.OwnerId, m.SentAt });
+        builder.HasIndex(m => new { m.DialogId, m.OwnerId, m.SentAt, m.ClientMessageId });
 
         // IV AES-256-GCM — ровно 12 байт
         builder.ToTable(t => t.HasCheckConstraint("ck_messages_iv_length", "length(iv) = 12"));

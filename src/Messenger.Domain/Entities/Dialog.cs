@@ -10,6 +10,7 @@ public class Dialog
     /// </summary>
     public required string PairKey { get; set; }
     public DateTime CreatedAt { get; set; }
+    public long MessageRevision { get; set; }
 
     public ICollection<DialogParticipant> Participants { get; set; } = new List<DialogParticipant>();
     public ICollection<Message> Messages { get; set; } = new List<Message>();

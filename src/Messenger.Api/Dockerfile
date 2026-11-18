@@ -14,7 +14,7 @@ COPY ["src/Messenger.Infrastructure/Messenger.Infrastructure.csproj", "src/Messe
 RUN dotnet restore "src/Messenger.Api/Messenger.Api.csproj"
 COPY . .
 WORKDIR "/src/src/Messenger.Api"
-RUN dotnet build "./Messenger.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./Messenger.Api.csproj" -c $BUILD_CONFIGURATION
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release

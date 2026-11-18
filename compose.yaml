@@ -7,6 +7,10 @@
     ports:
       - "${API_PORT}:8080"
     environment:
+      # Local HTTP demo. For network deployment configure TLS and Secure cookies.
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      Session__Secure: ${SESSION_COOKIE_SECURE:-false}
+      Database__ApplyMigrations: "true"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       # Зашифрованные байты вложений — в управляемом файловом хранилище.
       AttachmentStorage__RootPath: /app/storage

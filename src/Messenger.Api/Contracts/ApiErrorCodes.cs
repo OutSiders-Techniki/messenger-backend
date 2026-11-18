@@ -6,6 +6,12 @@ namespace Messenger.Api.Contracts;
 /// </summary>
 public static class ApiErrorCodes
 {
+    /// <summary>Превышено число запросов за интервал.</summary>
+    public const string RateLimited = "rate_limited";
+
+    /// <summary>Идентификатор сообщения уже использован для другого пакета или отправителя.</summary>
+    public const string MessageConflict = "message_conflict";
+
     /// <summary>Тело запроса не прошло проверку полей.</summary>
     public const string ValidationFailed = "validation_failed";
 

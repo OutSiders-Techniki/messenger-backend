@@ -32,6 +32,26 @@ public class ApiContractTests(MessengerApiFactory factory) : IClassFixture<Messe
     }
 
     [Fact]
+    public async Task OpenApiDocument_MessagePacketMatchesCurrentFrontend()
+    {
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/openapi/v1.json");
+        response.EnsureSuccessStatusCode();
+        var document = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var schemas = document.GetProperty("components").GetProperty("schemas");
+        foreach (var name in new[] { "SendMessageRequest", "MessageResponse" })
+        {
+            var properties = schemas.GetProperty(name).GetProperty("properties");
+            Assert.Equal("integer", properties.GetProperty("sentAt").GetProperty("type").GetString());
+            Assert.Equal("int64", properties.GetProperty("sentAt").GetProperty("format").GetString());
+            Assert.Equal("base64url", properties.GetProperty("iv").GetProperty("format").GetString());
+            Assert.Equal("base64url", properties.GetProperty("ct").GetProperty("format").GetString());
+        }
+        Assert.Contains("publicId", schemas.GetProperty("MessageResponse").GetProperty("properties")
+            .GetProperty("senderId").GetProperty("description").GetString());
+    }
+
+    [Fact]
     public async Task OpenApiDocument_ContainsAllEndpoints()
     {
         var client = factory.CreateClient();
@@ -57,6 +77,23 @@ public class ApiContractTests(MessengerApiFactory factory) : IClassFixture<Messe
     }
 
     [Fact]
+    public async Task OpenApiDocument_CurrentUserIdentifierHasUuidSchema()
+    {
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/openapi/v1.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var document = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var currentUser = document.GetProperty("components").GetProperty("schemas")
+            .GetProperty("CurrentUserResponse");
+        var identifier = currentUser.GetProperty("properties").GetProperty("id");
+
+        Assert.Equal("string", identifier.GetProperty("type").GetString());
+        Assert.Equal("uuid", identifier.GetProperty("format").GetString());
+        Assert.Contains("id", currentUser.GetProperty("required").EnumerateArray().Select(x => x.GetString()));
+    }
+
+    [Fact]
     public async Task OpenApiDocument_DeclaresErrorCode()
     {
         var client = factory.CreateClient();
@@ -79,6 +116,8 @@ public class ApiContractTests(MessengerApiFactory factory) : IClassFixture<Messe
         Assert.Contains(ApiErrorCodes.ValidationFailed, values);
         Assert.Contains(ApiErrorCodes.Unauthorized, values);
         Assert.Contains(ApiErrorCodes.DialogNotFound, values);
+        Assert.Contains(ApiErrorCodes.MessageConflict, values);
+        Assert.Contains(ApiErrorCodes.RateLimited, values);
     }
 
     [Fact]

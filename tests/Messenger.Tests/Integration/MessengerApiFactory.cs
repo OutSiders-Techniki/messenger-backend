@@ -24,6 +24,10 @@ public class MessengerApiFactory : WebApplicationFactory<Program>
 
                 // Тесты идут по http, поэтому Secure-cookie выключаем.
                 ["Session:Secure"] = "false",
+                // Лимиты проверяются отдельно; общий fixture не должен
+                // ограничивать регистрацию данных остальных тестов.
+                ["RateLimits:AuthPermitLimit"] = "10000",
+                ["RateLimits:SearchPermitLimit"] = "10000",
 
                 // Зашифрованные байты тестов пишем во временный каталог,
                 // рабочее хранилище не трогаем.
