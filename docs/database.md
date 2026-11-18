@@ -14,6 +14,8 @@ erDiagram
     users ||--o{ messages : "owner_id"
     messages ||--o{ attachments : ""
     users ||--o{ sessions : ""
+    dialogs ||--o{ message_receipts : ""
+    dialogs ||--o{ pending_file_deletions : ""
 
     users {
         uuid id PK
@@ -33,6 +35,7 @@ erDiagram
     dialogs {
         uuid id PK
         varchar(73) pair_key UK "minUserId:maxUserId — дедупликация, не секрет диалога"
+        bigint message_revision "растёт при каждом изменении сообщений диалога"
         timestamptz created_at
     }
 
@@ -63,6 +66,19 @@ erDiagram
         bytea encrypted_metadata "имя файла/тип, зашифрованы"
         timestamptz uploaded_at
     }
+
+    message_receipts {
+        uuid dialog_id PK,FK
+        uuid client_message_id PK
+        uuid sender_id FK
+        bytea fingerprint "SHA-256 отпечаток пакета, не шифротекст"
+        bigint revision "ревизия диалога на момент получения"
+    }
+
+    pending_file_deletions {
+        varchar(512) storage_key PK "файл, который надо удалить"
+        timestamptz created_at
+    }
 ```
 
 ## Две копии сообщения
@@ -73,6 +89,22 @@ erDiagram
 
 - «удалить у себя» — физический `DELETE` строки владельца, копия второго остаётся;
 - «удалить у обоих» — `DELETE` обеих строк в одной транзакции.
+
+## Квитанции сообщений (message_receipts)
+
+Минимальный отпечаток принятого пакета: ID диалога, сообщения, отправителя,
+SHA-256 отпечаток пакета и ревизия диалога. Шифротекст, IV и исходное время
+не хранятся — по квитанции восстановить сообщение нельзя. Квитанция пишется
+в одной транзакции с копиями и остаётся после удаления копий: задержавшийся
+повтор отправки того же пакета не воссоздаёт удалённые строки.
+
+## Очередь удаления файлов (pending_file_deletions)
+
+Задание на удаление файла вложения создаётся в той же транзакции, что и
+удаление последней копии, ссылающейся на файл. После commit сервер пытается
+удалить файл сразу; при сбое фоновая уборка повторяет попытку каждые 30
+секунд — так падение между фиксацией БД и удалением файла не оставляет
+файл-сироту навсегда.
 
 ## Сессии
 
@@ -90,6 +122,7 @@ erDiagram
 | `dialogs.pair_key` UNIQUE                                 | дубликат диалога 1-на-1 не создаётся               |
 | `messages(dialog_id, owner_id, client_message_id)` UNIQUE | идемпотентная отправка, дедупликация               |
 | `messages(dialog_id, owner_id, sent_at)`                  | постраничная загрузка истории                      |
+| `messages(dialog_id, owner_id, sent_at, client_message_id)` | keyset-пагинация при одинаковых метках времени    |
 | `ck_messages_iv_length`: `length(iv) = 12`                | IV AES-256-GCM 96 бит                              |
 | `ck_attachments_size`: `0 < size <= 25000000`             | лимит 25 МБ на вложение                            |
 | `ck_attachments_client_id`                                | идентификатор вложения не может быть пустым        |
@@ -102,8 +135,10 @@ erDiagram
 | Хранилище | Содержимое | Не допускается |
 |---|---|---|
 | `users` | ID, публичный ID, Argon2id-хеш, дата создания | пароль открыто, телефон/email |
-| `dialogs` | участники и дата создания | ключ диалога |
+| `dialogs` | участники, дата создания, ревизия сообщений | ключ диалога |
 | `messages` | владелец копии, диалог, отправитель, v/id/sentAt/iv/ct | открытый текст |
+| `message_receipts` | ID диалога/сообщения/отправителя, SHA-256 отпечаток, ревизия | шифротекст, IV, время |
+| `pending_file_deletions` | ключ файла к удалению | |
 | `attachments` | путь к зашифрованным байтам, размер, ссылки | открытые файлы, исходное имя файла |
 
 ## Хранилище файлов вложений
