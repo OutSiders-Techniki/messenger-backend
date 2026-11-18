@@ -59,6 +59,48 @@ public class AttachmentService(
     }
 
     /// <summary>
+    /// Открывает зашифрованные байты вложения на чтение. Доступно только
+    /// владельцу копии сообщения; содержимое отдаётся как есть —
+    /// расшифровка выполняется на клиенте.
+    /// </summary>
+    public async Task<Stream> OpenContentAsync(
+        Guid userId,
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid clientAttachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (clientAttachmentId == Guid.Empty)
+        {
+            throw new ValidationException("Идентификатор вложения не может быть пустым.");
+        }
+
+        var storageKey = await attachments.FindStorageKeyForOwnerAsync(
+            dialogId,
+            clientMessageId,
+            clientAttachmentId,
+            userId,
+            cancellationToken);
+
+        if (storageKey is null)
+        {
+            // Копии сообщения или вложения у пользователя нет: постороннему
+            // отвечаем так же, как на несуществующее вложение.
+            throw new AttachmentNotFoundException();
+        }
+
+        var content = await contentStore.OpenAsync(storageKey, cancellationToken);
+
+        if (content is null)
+        {
+            // Строка есть, а файла нет: наружу не раскрываем причину.
+            throw new AttachmentNotFoundException();
+        }
+
+        return content;
+    }
+
+    /// <summary>
     /// Загружает зашифрованные байты вложения в свою копию сообщения.
     /// Сервер сохраняет только ciphertext и зашифрованные клиентом
     /// метаданные: имя файла и тип содержимого сюда не попадают и MIME

@@ -26,4 +26,10 @@ public interface IAttachmentContentStore
 
     /// <summary>Удаляет сохранённое содержимое по ключу.</summary>
     Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Открывает сохранённое содержимое на чтение по ключу. Возвращает
+    /// размер в байтах; ключ не существует — <c>null</c>.
+    /// </summary>
+    Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default);
 }

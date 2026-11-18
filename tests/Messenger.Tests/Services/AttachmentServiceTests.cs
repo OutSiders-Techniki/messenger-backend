@@ -334,10 +334,17 @@ public class AttachmentServiceTests
         {
             return Task.CompletedTask;
         }
+
+        public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<Stream?>(SavedContent is null ? null : new MemoryStream(SavedContent));
+        }
     }
 
     private sealed class FakeAttachmentRepository : IAttachmentRepository
     {
+        public string? StorageKey { get; set; }
+
         private readonly List<(Guid OwnerId, Guid DialogId, AttachmentMetadataResponse Item)> _items = new();
 
         private readonly List<(Guid OwnerId, Guid DialogId, Guid ClientMessageId, Guid MessageId)>
@@ -421,6 +428,27 @@ public class AttachmentServiceTests
             }
 
             return Task.FromResult(false);
+        }
+
+        public Task<string?> FindStorageKeyForOwnerAsync(
+            Guid dialogId,
+            Guid clientMessageId,
+            Guid clientAttachmentId,
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            foreach (var (ownerId, itemDialogId, item) in _items)
+            {
+                if (item.ClientMessageId == clientMessageId
+                    && item.ClientAttachmentId == clientAttachmentId
+                    && itemDialogId == dialogId
+                    && ownerId == userId)
+                {
+                    return Task.FromResult(StorageKey);
+                }
+            }
+
+            return Task.FromResult<string?>(null);
         }
 
         public Task AddAsync(

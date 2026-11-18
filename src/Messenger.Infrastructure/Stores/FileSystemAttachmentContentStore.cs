@@ -82,18 +82,56 @@ public class FileSystemAttachmentContentStore : IAttachmentContentStore
             return Task.CompletedTask;
         }
 
-        // Ключи выдаёт только это хранилище. Произвольный путь из БД не является разрешением удалить файл.
-        if (storageKey.Length != 36 || !storageKey.EndsWith(".bin", StringComparison.Ordinal)
-            || !Guid.TryParseExact(storageKey[..32], "N", out _))
-            throw new InvalidOperationException("Некорректный ключ файлового хранилища.");
+        ValidateKey(storageKey);
 
         var path = Path.Combine(_rootPath, storageKey);
-        if (new FileInfo(path).LinkTarget is not null)
-            throw new InvalidOperationException("Символические ссылки в хранилище не поддерживаются.");
         // Не скрываем ошибку: транзакционная очередь сохранит задание для следующей попытки.
         File.Delete(path);
 
         return Task.CompletedTask;
+    }
+
+    public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(storageKey))
+        {
+            throw new InvalidOperationException("Некорректный ключ файлового хранилища.");
+        }
+
+        ValidateKey(storageKey);
+
+        var path = Path.Combine(_rootPath, storageKey);
+        if (new FileInfo(path).LinkTarget is not null)
+            throw new InvalidOperationException("Символические ссылки в хранилище не поддерживаются.");
+
+        try
+        {
+            Stream stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 81920,
+                useAsync: true);
+
+            return Task.FromResult<Stream?>(stream);
+        }
+        catch (FileNotFoundException)
+        {
+            // Файл мог быть удалён уборкой после проверки в сервисе.
+            return Task.FromResult<Stream?>(null);
+        }
+    }
+
+    /// <summary>Ключи выдаёт только это хранилище. Произвольный путь из БД не является разрешением на доступ к файлу.</summary>
+    private void ValidateKey(string storageKey)
+    {
+        if (storageKey.Length != 36 || !storageKey.EndsWith(".bin", StringComparison.Ordinal)
+            || !Guid.TryParseExact(storageKey[..32], "N", out _))
+            throw new InvalidOperationException("Некорректный ключ файлового хранилища.");
+
+        if (new FileInfo(Path.Combine(_rootPath, storageKey)).LinkTarget is not null)
+            throw new InvalidOperationException("Символические ссылки в хранилище не поддерживаются.");
     }
 
     /// <summary>

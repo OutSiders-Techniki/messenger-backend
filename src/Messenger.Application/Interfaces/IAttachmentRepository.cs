@@ -50,6 +50,18 @@ public interface IAttachmentRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Ключ содержимого вложения в хранилище — только владельцу копии
+    /// сообщения. Для постороннего результат такой же, как для
+    /// несуществующего вложения.
+    /// </summary>
+    Task<string?> FindStorageKeyForOwnerAsync(
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid clientAttachmentId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Сохраняет вложение в копии сообщения. Повторная загрузка того же
     /// клиентского идентификатора в ту же копию — конфликт.
     /// </summary>

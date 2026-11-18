@@ -194,6 +194,75 @@ public class AttachmentUploadTests(MessengerApiFactory factory) : IClassFixture<
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [SkippableFact]
+    public async Task Download_FromOwnCopy_ReturnsUploadedBytes()
+    {
+        await EnsureDatabaseAsync();
+
+        var client = factory.CreateClient();
+
+        var ownerId = await RegisterAsync(factory.CreateClient());
+        var companionId = await RegisterAsync(factory.CreateClient());
+
+        await LoginAsync(client, ownerId);
+
+        var seeded = await SeedMessageCopyAsync(ownerId, companionId);
+        var clientAttachmentId = Guid.NewGuid();
+        var content = new byte[] { 10, 20, 30, 40, 50 };
+
+        var upload = await UploadAsync(client, seeded, clientAttachmentId, content, [7]);
+
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+
+        var download = await client.GetAsync(
+            $"/dialogs/{seeded.DialogId}/messages/{seeded.ClientMessageId}"
+            + $"/attachments/{clientAttachmentId}/content");
+
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal(await download.Content.ReadAsByteArrayAsync(), content);
+    }
+
+    [SkippableFact]
+    public async Task Download_FromForeignCopy_ReturnsNotFound()
+    {
+        await EnsureDatabaseAsync();
+
+        var strangerClient = factory.CreateClient();
+
+        var ownerId = await RegisterAsync(factory.CreateClient());
+        var companionId = await RegisterAsync(factory.CreateClient());
+        var strangerId = await RegisterAsync(factory.CreateClient());
+
+        await LoginAsync(strangerClient, strangerId);
+
+        var seeded = await SeedMessageCopyAsync(ownerId, companionId);
+        var clientAttachmentId = Guid.NewGuid();
+
+        var ownerClient = factory.CreateClient();
+        await LoginAsync(ownerClient, ownerId);
+        var upload = await UploadAsync(ownerClient, seeded, clientAttachmentId, [1, 2], [7]);
+
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+
+        // Чужая копия сообщения не раскрывается: тот же ответ, что для
+        // несуществующего вложения.
+        var download = await strangerClient.GetAsync(
+            $"/dialogs/{seeded.DialogId}/messages/{seeded.ClientMessageId}"
+            + $"/attachments/{clientAttachmentId}/content");
+
+        Assert.Equal(HttpStatusCode.NotFound, download.StatusCode);
+    }
+
+    [Fact]
+    public async Task Download_WithoutSession_ReturnsUnauthorized()
+    {
+        var response = await factory.CreateClient().GetAsync(
+            $"/dialogs/{Guid.NewGuid()}/messages/{Guid.NewGuid()}"
+            + $"/attachments/{Guid.NewGuid()}/content");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private static async Task<HttpResponseMessage> UploadAsync(
         HttpClient client,
         SeededMessage seeded,
@@ -217,8 +286,7 @@ public class AttachmentUploadTests(MessengerApiFactory factory) : IClassFixture<
     }
 
     /// <summary>
-    /// Заносит копию сообщения напрямую в базу: отправка сообщений
-    /// в API ещё не реализована.
+    /// Заносит копию сообщения напрямую в базу.
     /// </summary>
     private async Task<SeededMessage> SeedMessageCopyAsync(
         string ownerPublicId,

@@ -50,6 +50,8 @@ public sealed class FileDeletionProcessorTests
             throw new NotSupportedException();
         public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
         { DeleteCalls++; return Task.CompletedTask; }
+        public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }
 

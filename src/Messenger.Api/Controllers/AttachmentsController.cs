@@ -140,6 +140,38 @@ public class AttachmentsController(AttachmentService attachmentService) : Contro
             uploaded);
     }
 
+    /// <summary>
+    /// Скачивание зашифрованных байтов вложения из своей копии сообщения.
+    /// Тело ответа — сами зашифрованные байты: расшифровка выполняется на
+    /// клиенте ключом диалога. Доступно только владельцу копии сообщения.
+    /// </summary>
+    [Authorize]
+    [HttpGet("{clientAttachmentId:guid}/content")]
+    [ResponseCache(NoStore = true)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Download(
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid clientAttachmentId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return BuildUnauthorized();
+        }
+
+        var content = await attachmentService.OpenContentAsync(
+            userId,
+            dialogId,
+            clientMessageId,
+            clientAttachmentId,
+            cancellationToken);
+
+        return File(content, "application/octet-stream", enableRangeProcessing: false);
+    }
+
     private static byte[] DecodeMetadata(string? encryptedMetadata)
     {
         if (string.IsNullOrWhiteSpace(encryptedMetadata))

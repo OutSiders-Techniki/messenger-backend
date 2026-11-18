@@ -96,6 +96,26 @@ public class AttachmentRepository(AppDbContext context) : IAttachmentRepository
                 cancellationToken);
     }
 
+    public async Task<string?> FindStorageKeyForOwnerAsync(
+        Guid dialogId,
+        Guid clientMessageId,
+        Guid clientAttachmentId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        // Ключ хранилища наружу не отдаём — он внутренний и нужен только
+        // для чтения содержимого.
+        return await context.Attachments
+            .AsNoTracking()
+            .Where(a =>
+                a.Message.DialogId == dialogId
+                && a.Message.ClientMessageId == clientMessageId
+                && a.ClientAttachmentId == clientAttachmentId
+                && a.Message.OwnerId == userId)
+            .Select(a => a.StorageKey)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public async Task AddAsync(
         Attachment attachment,
         CancellationToken cancellationToken = default)
