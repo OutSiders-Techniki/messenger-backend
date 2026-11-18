@@ -33,12 +33,18 @@ Wildcard, пути и credentials запрещены; `Sec-Fetch-Site: cross-sit
 за 900 секунд. Точный поиск ограничен 30 запросами за 60 секунд на пару
 пользователь/IP. Повторные неуспешные запросы также расходуют лимит.
 Переполнение возвращает 429 `application/problem+json`, код `rate_limited`
-и `Retry-After` (секунды). Заголовок `X-Forwarded-For` клиента не меняет ключ.
+и `Retry-After` (секунды). Заголовок `X-Forwarded-For` клиента не меняет ключ,
+если доверие к прокси не включено (`ForwardedHeaders:Enabled`).
 
 Настройки: `RateLimits:AuthPermitLimit`, `RateLimits:AuthWindowSeconds`,
 `RateLimits:SearchPermitLimit`, `RateLimits:SearchWindowSeconds` — положительные
 целые числа. Лимитеры рассчитаны на один процесс API в MVP Compose; при
 нескольких экземплярах необходим общий limiter на доверенном gateway/store.
+
+За обратным прокси (TLS-терминация) включите `ForwardedHeaders:Enabled=true`,
+чтобы клиент определялся по `X-Forwarded-For`: без этого все клиенты разделят
+один лимит. Включать стоит только за прокси — напрямую доступный сервис
+доверять заголовку не должен: его можно подделать и обойти лимит.
 
 `SecurityTests` проверяет реальный HTTP pipeline без внешней БД: атрибуты cookie,
 отзыв сессии, заголовки, CSP, rate limits, CSRF и WebSocket origin, HSTS.

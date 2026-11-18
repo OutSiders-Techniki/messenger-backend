@@ -8,6 +8,7 @@ using Messenger.Application.Options;
 using Messenger.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Messenger.Infrastructure.Db;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,23 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrations"))
 
 // JSON-документ спецификации доступен во всех средах: фронтенду нужен
 // стабильный контракт. Интерактивный UI не отдаём.
+// Real IP клиента восстанавливается до всего остального: rate limit
+// разбивается по IP, и за TLS-прокси без этого все клиенты делят один лимит.
+// По умолчанию выключено: сервис в Compose торчит наружу напрямую, и доверие
+// к заголовку дало бы клиенту возможность подменить свой IP. Включается
+// настройкой ForwardedHeaders:Enabled, когда перед API стоит прокси.
+if (app.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+{
+    var forwarded = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    };
+    // Прокси разворачивается рядом: заранее список его адресов неизвестен,
+    // поэтому доверяем заголовкам от любого источника сети развёртывания.
+    forwarded.KnownIPNetworks.Clear();
+    forwarded.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwarded);
+}
 app.MapOpenApi();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 if (!app.Environment.IsDevelopment())
