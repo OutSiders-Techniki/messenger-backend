@@ -61,4 +61,3 @@ MESSENGER_TEST_DB='Host=localhost;Port=5432;Database=messenger;Username=messenge
 - [Сообщения, идемпотентность, SignalR и синхронизация удаления](docs/messaging.md).
 - [Схема БД](docs/database.md).
 - [Криптографический формат и тестовый вектор](docs/protocol-v1.md).
-- [Покрытие задач #41–#53 и проверка](docs/backend-tasks.md).
