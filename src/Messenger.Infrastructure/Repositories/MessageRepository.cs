@@ -72,8 +72,14 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
 
     public async Task<MessageHistoryResponse> GetHistoryAsync(Guid userId, Guid dialogId, int limit, string? before, CancellationToken cancellationToken = default)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        var dialog = await LockDialogAsync(userId, dialogId, cancellationToken);
+        // Чтение не берёт FOR UPDATE на строке диалога: читатели не должны
+        // сериализоваться с писателями. Ревизия читается снимком; изменение
+        // во время пагинации клиент замечает по сверкам ревизий.
+        var revision = await context.Dialogs.AsNoTracking()
+            .Where(d => d.Id == dialogId
+                        && context.DialogParticipants.Any(p => p.DialogId == dialogId && p.UserId == userId))
+            .Select(d => (long?)d.MessageRevision).SingleOrDefaultAsync(cancellationToken)
+            ?? throw new DialogNotFoundException();
         var query = context.Messages.AsNoTracking().Include(x => x.Sender).Where(x => x.DialogId == dialogId && x.OwnerId == userId);
         (DateTime SentAt, Guid Id)? cursor;
         if (Guid.TryParseExact(before, "D", out var anchorId))
@@ -96,8 +102,7 @@ public sealed partial class MessageRepository(AppDbContext context, FileDeletion
         var more = rows.Count > limit;
         var items = rows.Take(limit).Select(ToResponse).ToArray();
         var next = more ? EncodeCursor(rows[limit - 1]) : null;
-        await transaction.CommitAsync(cancellationToken);
-        return new MessageHistoryResponse(items, next, dialog.MessageRevision, more ? rows[limit - 1].ClientMessageId : null);
+        return new MessageHistoryResponse(items, next, revision, more ? rows[limit - 1].ClientMessageId : null);
     }
 
     public async Task<SyncMessagesResponse> SyncAsync(Guid userId, Guid dialogId, Guid[] ids, CancellationToken cancellationToken = default)
